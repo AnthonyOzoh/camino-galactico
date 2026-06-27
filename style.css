@@ -1,4 +1,4 @@
-/* Camino Galáctico Final - Clean Runner Version */
+/* Camino Galáctico - Release Version */
 
 :root {
   --navy: #050B2E;
@@ -7,26 +7,34 @@
   --cyan: #00F5FF;
   --gold: #FFC857;
   --white: #F4F7FF;
-  --danger: #FF3D7F;
+  --danger: #FF4D6D;
   --glass: rgba(255,255,255,.08);
-  --line: rgba(255,255,255,.16);
+  --border: rgba(255,255,255,.16);
 }
 
-* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
 
-html, body {
+html,
+body {
   margin: 0;
   min-height: 100%;
   overflow: hidden;
   background:
-    radial-gradient(circle at top left, rgba(30,123,255,.35), transparent 26rem),
-    radial-gradient(circle at bottom right, rgba(255,200,87,.15), transparent 24rem),
+    radial-gradient(circle at 20% 0%, rgba(30,123,255,.38), transparent 25rem),
+    radial-gradient(circle at 85% 90%, rgba(255,200,87,.16), transparent 25rem),
     var(--navy);
   color: var(--white);
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-button { border: 0; font: inherit; cursor: pointer; }
+button {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
 
 .page {
   min-height: 100vh;
@@ -35,69 +43,74 @@ button { border: 0; font: inherit; cursor: pointer; }
   padding: 12px;
 }
 
-.shell { width: min(100%, 980px); }
+.game-shell {
+  width: min(100%, 980px);
+}
 
-.header {
+.top {
   display: flex;
-  align-items: end;
   justify-content: space-between;
+  align-items: end;
   gap: 12px;
   margin-bottom: 10px;
 }
 
-.header p {
+.top p {
   margin: 0 0 3px;
   color: var(--gold);
-  letter-spacing: .22em;
   text-transform: uppercase;
+  letter-spacing: .22em;
   font-size: clamp(.62rem, 2vw, .82rem);
 }
 
-.header h1 {
+.top h1 {
   margin: 0;
-  font-size: clamp(1.45rem, 6vw, 3.15rem);
+  font-size: clamp(1.45rem, 6vw, 3.2rem);
   line-height: 1;
   letter-spacing: -.06em;
-  text-shadow: 0 0 25px rgba(0,245,255,.42);
+  text-shadow: 0 0 24px rgba(0,245,255,.45);
 }
 
-.scores { display: flex; gap: 8px; }
+.score-box {
+  display: flex;
+  gap: 8px;
+}
 
-.scores div {
+.score-box div {
   min-width: 72px;
-  padding: 8px 11px;
-  border: 1px solid var(--line);
+  padding: 8px 10px;
+  border: 1px solid var(--border);
   border-radius: 18px;
   background: var(--glass);
   text-align: center;
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(14px);
 }
 
-.scores span {
+.score-box span {
   display: block;
+  color: rgba(244,247,255,.68);
   font-size: .72rem;
-  color: rgba(244,247,255,.7);
 }
 
-.scores strong {
+.score-box strong {
   display: block;
-  font-size: 1.25rem;
   color: var(--cyan);
+  font-size: 1.25rem;
 }
 
-.game-wrap {
+.stage {
   position: relative;
-  width: 100%;
-  height: min(72vh, 620px);
-  min-height: 420px;
   overflow: hidden;
-  border: 1px solid var(--line);
+  width: 100%;
+  height: min(73vh, 650px);
+  min-height: 430px;
+  border: 1px solid var(--border);
   border-radius: 28px;
   background: #020617;
   box-shadow:
-    0 22px 80px rgba(0,0,0,.45),
-    inset 0 0 60px rgba(0,245,255,.08);
-  touch-action: manipulation;
+    0 22px 85px rgba(0,0,0,.45),
+    inset 0 0 55px rgba(0,245,255,.08);
+  touch-action: none;
 }
 
 canvas {
@@ -109,24 +122,26 @@ canvas {
 .overlay {
   position: absolute;
   inset: 0;
+  z-index: 4;
   display: none;
   place-items: center;
   text-align: center;
   padding: 24px;
   background:
-    linear-gradient(180deg, rgba(5,11,46,.7), rgba(5,11,46,.96)),
-    radial-gradient(circle at center, rgba(0,245,255,.14), transparent 22rem);
+    linear-gradient(180deg, rgba(5,11,46,.68), rgba(5,11,46,.96)),
+    radial-gradient(circle at center, rgba(0,245,255,.14), transparent 23rem);
   backdrop-filter: blur(10px);
-  z-index: 4;
 }
 
-.overlay.active { display: grid; }
+.overlay.active {
+  display: grid;
+}
 
 .overlay img {
   width: min(180px, 42vw);
   border-radius: 22px;
   margin-bottom: 14px;
-  box-shadow: 0 0 35px rgba(0,245,255,.22);
+  box-shadow: 0 0 36px rgba(0,245,255,.22);
 }
 
 .overlay h2 {
@@ -134,7 +149,7 @@ canvas {
   font-size: clamp(2.25rem, 9vw, 5rem);
   line-height: .9;
   letter-spacing: -.07em;
-  text-shadow: 0 0 28px rgba(0,245,255,.45);
+  text-shadow: 0 0 30px rgba(0,245,255,.45);
 }
 
 .overlay p {
@@ -157,7 +172,7 @@ canvas {
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: .05em;
-  box-shadow: 0 0 28px rgba(0,245,255,.35);
+  box-shadow: 0 0 30px rgba(0,245,255,.35);
 }
 
 footer {
@@ -169,22 +184,30 @@ footer {
   font-size: .82rem;
 }
 
-footer strong { color: var(--gold); }
+footer strong {
+  color: var(--gold);
+}
 
 @media (max-width: 760px) {
-  .page { padding: 8px; align-items: start; }
-  .game-wrap {
+  .page {
+    padding: 8px;
+    align-items: start;
+  }
+
+  .stage {
     height: calc(100vh - 178px);
     min-height: 470px;
     border-radius: 24px;
   }
+
+  .score-box div {
+    min-width: 64px;
+    padding: 7px 8px;
+  }
+
   footer {
     flex-direction: column;
     text-align: center;
     font-size: .73rem;
-  }
-  .scores div {
-    min-width: 64px;
-    padding: 7px 8px;
   }
 }

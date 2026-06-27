@@ -1,5 +1,5 @@
-// Camino Galáctico Final
-// Clean cosmic runner by Nexora Games
+// Camino Galáctico - Release Version
+// Polished simple space runner by Nexora Games
 // Parent Company: Ancherem Innovation LTD
 
 const canvas = document.getElementById("game");
@@ -21,7 +21,7 @@ const C = {
   cyan: "#00F5FF",
   gold: "#FFC857",
   white: "#F4F7FF",
-  danger: "#FF3D7F",
+  danger: "#FF4D6D",
   purple: "#8A2CFF"
 };
 
@@ -33,27 +33,26 @@ let raf = null;
 let last = 0;
 
 let score = 0;
-let best = Number(localStorage.getItem("caminoGalacticoCleanBest") || 0);
+let best = Number(localStorage.getItem("caminoGalacticoReleaseBest") || 0);
 bestEl.textContent = best;
 
-const player = {
-  x: 120,
+const ship = {
+  x: 0,
   y: 0,
-  r: 24,
-  vy: 0,
-  grounded: true,
-  trail: []
+  targetX: 0,
+  size: 42,
+  invincible: 0
 };
 
-let ground = 0;
-let speed = 420;
-let obstacles = [];
-let coins = [];
-let stars = [];
+let speed = 260;
+let asteroids = [];
+let starsToCollect = [];
+let starfield = [];
 let particles = [];
-let spawnTimer = 0;
-let coinTimer = 0;
+let asteroidTimer = 0;
+let collectTimer = 0;
 let roadOffset = 0;
+let dragging = false;
 
 function resize() {
   const rect = canvas.parentElement.getBoundingClientRect();
@@ -64,62 +63,65 @@ function resize() {
 
   W = rect.width;
   H = rect.height;
-  ground = H * 0.76;
 
-  player.x = Math.max(82, W * 0.16);
-  player.r = Math.max(18, Math.min(28, W * 0.035));
-  if (state !== "playing") {
-    player.y = ground - player.r;
-  }
+  ship.size = Math.max(34, Math.min(52, W * 0.06));
+  ship.x = ship.targetX || W / 2;
+  ship.targetX = ship.x;
+  ship.y = H * 0.78;
 
-  stars = Array.from({ length: Math.floor(W / 9) }, () => ({
-    x: Math.random() * W,
-    y: Math.random() * H * 0.55,
-    r: Math.random() * 1.7 + 0.35,
-    a: Math.random() * 0.65 + 0.25,
-    v: Math.random() * 18 + 8
-  }));
-
+  createStarfield();
   draw();
 }
 
-function reset() {
+function createStarfield() {
+  starfield = Array.from({ length: Math.floor(W / 8) }, () => ({
+    x: Math.random() * W,
+    y: Math.random() * H,
+    r: Math.random() * 1.8 + 0.35,
+    a: Math.random() * 0.65 + 0.25,
+    v: Math.random() * 80 + 35
+  }));
+}
+
+function resetGame() {
   score = 0;
-  speed = Math.max(380, W * 0.48);
-  obstacles = [];
-  coins = [];
+  speed = Math.max(230, H * 0.42);
+  asteroids = [];
+  starsToCollect = [];
   particles = [];
-  spawnTimer = 0.8;
-  coinTimer = 1.0;
+  asteroidTimer = 0.3;
+  collectTimer = 1.1;
   roadOffset = 0;
 
-  player.y = ground - player.r;
-  player.vy = 0;
-  player.grounded = true;
-  player.trail = [];
+  ship.x = W / 2;
+  ship.targetX = W / 2;
+  ship.y = H * 0.78;
+  ship.invincible = 0;
+
   scoreEl.textContent = "0";
 }
 
-function start() {
-  reset();
+function startGame() {
+  resetGame();
   state = "playing";
   startScreen.classList.remove("active");
   gameOverScreen.classList.remove("active");
+
   last = performance.now();
   cancelAnimationFrame(raf);
   raf = requestAnimationFrame(loop);
 }
 
-function end() {
+function endGame() {
   state = "over";
   cancelAnimationFrame(raf);
 
   best = Math.max(best, Math.floor(score));
-  localStorage.setItem("caminoGalacticoCleanBest", String(best));
-
+  localStorage.setItem("caminoGalacticoReleaseBest", String(best));
   bestEl.textContent = best;
   finalScoreEl.textContent = Math.floor(score);
   finalBestEl.textContent = best;
+
   gameOverScreen.classList.add("active");
 }
 
@@ -133,122 +135,100 @@ function loop(now) {
   if (state === "playing") raf = requestAnimationFrame(loop);
 }
 
-function jump() {
-  if (state !== "playing") {
-    start();
-    return;
-  }
-
-  if (player.grounded) {
-    player.vy = -Math.max(720, H * 1.22);
-    player.grounded = false;
-    burst(player.x, player.y + player.r, C.cyan, 12);
-  }
-}
-
 function update(dt) {
-  score += dt * 16;
-  speed += dt * 7;
-  scoreEl.textContent = Math.floor(score);
+  score += dt * 12;
+  speed += dt * 4.5;
   roadOffset += speed * dt;
+  scoreEl.textContent = Math.floor(score);
 
-  player.vy += Math.max(1800, H * 3.0) * dt;
-  player.y += player.vy * dt;
+  ship.x += (ship.targetX - ship.x) * Math.min(1, dt * 12);
+  ship.targetX = clamp(ship.targetX, ship.size * 0.9, W - ship.size * 0.9);
 
-  if (player.y >= ground - player.r) {
-    player.y = ground - player.r;
-    player.vy = 0;
-    player.grounded = true;
+  asteroidTimer -= dt;
+  collectTimer -= dt;
+
+  if (asteroidTimer <= 0) {
+    spawnAsteroid();
+    asteroidTimer = Math.max(0.42, random(0.72, 1.18) - score / 3000);
   }
 
-  player.trail.unshift({ x: player.x, y: player.y, r: player.r, life: 1 });
-  player.trail = player.trail.slice(0, 12);
-  player.trail.forEach(t => {
-    t.x -= speed * dt * 0.34;
-    t.life -= dt * 2.2;
-  });
-  player.trail = player.trail.filter(t => t.life > 0);
-
-  spawnTimer -= dt;
-  coinTimer -= dt;
-
-  if (spawnTimer <= 0) {
-    spawnObstacle();
-    spawnTimer = Math.max(0.78, random(1.05, 1.55) - score / 1300);
+  if (collectTimer <= 0) {
+    spawnCollectible();
+    collectTimer = random(0.82, 1.45);
   }
 
-  if (coinTimer <= 0) {
-    spawnCoin();
-    coinTimer = random(0.75, 1.1);
+  for (const a of asteroids) {
+    a.y += speed * dt * a.speedMul;
+    a.rot += dt * a.spin;
   }
 
-  obstacles.forEach(o => o.x -= speed * dt);
-  coins.forEach(c => {
-    c.x -= speed * dt;
-    c.spin += dt * 4;
-  });
+  for (const s of starsToCollect) {
+    s.y += speed * dt * 0.9;
+    s.rot += dt * 4;
+  }
 
-  obstacles = obstacles.filter(o => o.x + o.w > -80);
-  coins = coins.filter(c => !c.dead && c.x + c.r > -50);
-
-  for (const s of stars) {
-    s.x -= s.v * dt;
-    if (s.x < -5) {
-      s.x = W + 10;
-      s.y = Math.random() * H * 0.55;
+  for (const s of starfield) {
+    s.y += s.v * dt + speed * dt * 0.08;
+    if (s.y > H + 8) {
+      s.y = -8;
+      s.x = Math.random() * W;
     }
   }
 
   updateParticles(dt);
+
+  asteroids = asteroids.filter(a => a.y - a.r < H + 80);
+  starsToCollect = starsToCollect.filter(s => !s.dead && s.y - s.r < H + 60);
+
   checkCollisions();
 }
 
-function spawnObstacle() {
-  const h = random(42, 72) * Math.max(0.85, Math.min(1.15, W / 900));
-  const w = h * random(0.72, 0.95);
-
-  obstacles.push({
-    x: W + 60,
-    y: ground - h,
-    w,
-    h,
-    angle: random(-0.1, 0.1)
+function spawnAsteroid() {
+  const r = random(22, 42) * Math.max(0.85, Math.min(1.2, W / 780));
+  asteroids.push({
+    x: random(r + 10, W - r - 10),
+    y: -r - 30,
+    r,
+    rot: random(0, Math.PI * 2),
+    spin: random(-2, 2),
+    speedMul: random(0.85, 1.22),
+    sides: Math.floor(random(7, 11))
   });
 }
 
-function spawnCoin() {
-  const high = Math.random() > 0.45;
-  coins.push({
-    x: W + 50,
-    y: high ? ground - random(120, 190) : ground - random(58, 95),
-    r: Math.max(10, player.r * 0.48),
-    spin: Math.random() * 6,
+function spawnCollectible() {
+  const r = Math.max(10, ship.size * 0.28);
+  starsToCollect.push({
+    x: random(r + 14, W - r - 14),
+    y: -r - 25,
+    r,
+    rot: random(0, Math.PI * 2),
     dead: false
   });
 }
 
 function checkCollisions() {
-  for (const o of obstacles) {
-    const pad = player.r * 0.35;
-    const closestX = clamp(player.x, o.x, o.x + o.w);
-    const closestY = clamp(player.y, o.y, o.y + o.h);
-    const dx = player.x - closestX;
-    const dy = player.y - closestY;
+  for (const a of asteroids) {
+    const dx = ship.x - a.x;
+    const dy = ship.y - a.y;
+    const hitDistance = ship.size * 0.42 + a.r * 0.72;
 
-    if (dx * dx + dy * dy < (player.r - pad) * (player.r - pad)) {
-      burst(player.x, player.y, C.danger, 24);
-      end();
+    if (dx * dx + dy * dy < hitDistance * hitDistance) {
+      burst(ship.x, ship.y, C.danger, 34);
+      endGame();
       return;
     }
   }
 
-  for (const c of coins) {
-    const dx = player.x - c.x;
-    const dy = player.y - c.y;
-    if (dx * dx + dy * dy < (player.r + c.r) * (player.r + c.r)) {
-      c.dead = true;
-      score += 40;
-      burst(c.x, c.y, C.gold, 14);
+  for (const s of starsToCollect) {
+    const dx = ship.x - s.x;
+    const dy = ship.y - s.y;
+    const hitDistance = ship.size * 0.46 + s.r;
+
+    if (dx * dx + dy * dy < hitDistance * hitDistance) {
+      s.dead = true;
+      score += 55;
+      burst(s.x, s.y, C.gold, 16);
     }
   }
 }
@@ -256,31 +236,33 @@ function checkCollisions() {
 function draw() {
   drawBackground();
   drawRoad();
-  drawCoins();
-  drawObstacles();
-  drawPlayer();
+  drawCollectibles();
+  drawAsteroids();
+  drawShip();
   drawParticles();
 
-  if (state === "playing") drawTip();
+  if (state === "playing") {
+    drawTip();
+  }
 }
 
 function drawBackground() {
-  const g = ctx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, "#020617");
-  g.addColorStop(0.52, C.navy);
-  g.addColorStop(1, "#020817");
-  ctx.fillStyle = g;
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, "#020617");
+  bg.addColorStop(0.48, C.navy);
+  bg.addColorStop(1, "#020817");
+  ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
-  const nebula = ctx.createRadialGradient(W * 0.68, H * 0.22, 0, W * 0.68, H * 0.22, W * 0.58);
-  nebula.addColorStop(0, "rgba(0,245,255,.18)");
-  nebula.addColorStop(0.38, "rgba(30,123,255,.08)");
+  const nebula = ctx.createRadialGradient(W * 0.7, H * 0.18, 0, W * 0.7, H * 0.18, W * 0.6);
+  nebula.addColorStop(0, "rgba(0,245,255,.17)");
+  nebula.addColorStop(0.35, "rgba(30,123,255,.08)");
   nebula.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = nebula;
   ctx.fillRect(0, 0, W, H);
 
   ctx.save();
-  for (const s of stars) {
+  for (const s of starfield) {
     ctx.globalAlpha = s.a;
     ctx.fillStyle = C.white;
     ctx.beginPath();
@@ -289,164 +271,171 @@ function drawBackground() {
   }
   ctx.restore();
 
-  // planet horizon
-  const hy = H * 0.33;
+  drawHorizon();
+}
+
+function drawHorizon() {
+  const y = H * 0.26;
   ctx.save();
-  ctx.strokeStyle = "rgba(255,200,87,.86)";
+  ctx.strokeStyle = "rgba(255,200,87,.84)";
   ctx.lineWidth = 3;
   ctx.shadowColor = C.gold;
   ctx.shadowBlur = 18;
   ctx.beginPath();
-  ctx.moveTo(-50, hy + 32);
-  ctx.quadraticCurveTo(W * 0.5, hy - 14, W + 50, hy + 32);
+  ctx.moveTo(-60, y + 32);
+  ctx.quadraticCurveTo(W * 0.5, y - 16, W + 60, y + 32);
   ctx.stroke();
 
   ctx.fillStyle = C.gold;
   ctx.beginPath();
-  ctx.arc(W * 0.74, hy + 18, 8, 0, Math.PI * 2);
+  ctx.arc(W * 0.75, y + 18, 8, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }
 
 function drawRoad() {
+  const topY = H * 0.22;
+  const bottomY = H + 80;
+  const center = W / 2;
+  const topHalf = W * 0.08;
+  const bottomHalf = W * 0.45;
+
   ctx.save();
 
-  const roadTop = ground + player.r * 0.9;
-  const roadBottom = H + 80;
-  const roadH = roadBottom - roadTop;
+  const road = ctx.createLinearGradient(0, topY, 0, bottomY);
+  road.addColorStop(0, "rgba(0,245,255,.02)");
+  road.addColorStop(0.45, "rgba(0,245,255,.12)");
+  road.addColorStop(1, "rgba(30,123,255,.24)");
+  ctx.fillStyle = road;
 
-  const roadG = ctx.createLinearGradient(0, roadTop, W, roadBottom);
-  roadG.addColorStop(0, "rgba(0,245,255,.17)");
-  roadG.addColorStop(0.55, "rgba(30,123,255,.22)");
-  roadG.addColorStop(1, "rgba(255,200,87,.1)");
-
-  ctx.fillStyle = roadG;
   ctx.beginPath();
-  ctx.moveTo(-80, roadBottom);
-  ctx.lineTo(W + 80, roadBottom);
-  ctx.lineTo(W * 0.63, roadTop);
-  ctx.lineTo(W * 0.12, roadTop);
+  ctx.moveTo(center - topHalf, topY);
+  ctx.lineTo(center + topHalf, topY);
+  ctx.lineTo(center + bottomHalf, bottomY);
+  ctx.lineTo(center - bottomHalf, bottomY);
   ctx.closePath();
   ctx.fill();
 
-  ctx.strokeStyle = "rgba(0,245,255,.9)";
-  ctx.lineWidth = 3;
   ctx.shadowColor = C.cyan;
-  ctx.shadowBlur = 15;
-
-  ctx.beginPath();
-  ctx.moveTo(W * 0.12, roadTop);
-  ctx.lineTo(-80, roadBottom);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(W * 0.63, roadTop);
-  ctx.lineTo(W + 80, roadBottom);
-  ctx.stroke();
-
-  // moving road lines
+  ctx.shadowBlur = 12;
   ctx.lineWidth = 2;
-  ctx.shadowBlur = 7;
-  for (let i = -2; i < 20; i++) {
-    const y = roadTop + ((roadOffset * 0.5 + i * 42) % roadH);
-    const p = (y - roadTop) / roadH;
-    const left = lerp(W * 0.12, -80, p);
-    const right = lerp(W * 0.63, W + 80, p);
-    ctx.strokeStyle = "rgba(244,247,255,.14)";
+
+  for (let i = -3; i <= 3; i++) {
+    const t = i / 3;
+    ctx.strokeStyle = i === 0 ? "rgba(0,245,255,.72)" : "rgba(0,245,255,.35)";
     ctx.beginPath();
-    ctx.moveTo(left, y);
-    ctx.lineTo(right, y);
+    ctx.moveTo(center + t * topHalf, topY);
+    ctx.lineTo(center + t * bottomHalf, bottomY);
     ctx.stroke();
   }
 
-  // ground line
-  ctx.shadowColor = C.cyan;
-  ctx.shadowBlur = 16;
-  ctx.strokeStyle = C.cyan;
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(0, ground + player.r);
-  ctx.lineTo(W, ground + player.r);
-  ctx.stroke();
+  const span = bottomY - topY;
+  for (let i = -2; i < 20; i++) {
+    const y = topY + ((roadOffset * 0.6 + i * 48) % span);
+    const p = (y - topY) / span;
+    const half = topHalf + (bottomHalf - topHalf) * p;
+
+    ctx.strokeStyle = "rgba(244,247,255,.13)";
+    ctx.beginPath();
+    ctx.moveTo(center - half, y);
+    ctx.lineTo(center + half, y);
+    ctx.stroke();
+  }
 
   ctx.restore();
 }
 
-function drawPlayer() {
+function drawShip() {
+  const s = ship.size;
+  const x = ship.x;
+  const y = ship.y;
+
   ctx.save();
+  ctx.translate(x, y);
 
-  // trail
-  for (const t of player.trail) {
-    ctx.globalAlpha = Math.max(0, t.life) * 0.35;
-    ctx.fillStyle = C.cyan;
-    ctx.shadowColor = C.cyan;
-    ctx.shadowBlur = 18;
-    ctx.beginPath();
-    ctx.arc(t.x, t.y, t.r * t.life, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.globalAlpha = 1;
-
-  // comet tail
+  // engine trail
   ctx.shadowColor = C.gold;
-  ctx.shadowBlur = 18;
-  const tail = ctx.createLinearGradient(player.x - player.r * 4, player.y, player.x, player.y);
-  tail.addColorStop(0, "rgba(255,200,87,0)");
-  tail.addColorStop(0.42, "rgba(255,200,87,.62)");
-  tail.addColorStop(1, "rgba(0,245,255,.95)");
-  ctx.fillStyle = tail;
+  ctx.shadowBlur = 20;
+  const trail = ctx.createLinearGradient(0, s * 0.25, 0, s * 1.4);
+  trail.addColorStop(0, "rgba(255,200,87,.95)");
+  trail.addColorStop(1, "rgba(255,200,87,0)");
+  ctx.fillStyle = trail;
   ctx.beginPath();
-  ctx.moveTo(player.x - player.r * 4.2, player.y);
-  ctx.quadraticCurveTo(player.x - player.r * 1.4, player.y - player.r * 1.2, player.x, player.y - player.r * .55);
-  ctx.quadraticCurveTo(player.x - player.r * .3, player.y, player.x, player.y + player.r * .55);
-  ctx.quadraticCurveTo(player.x - player.r * 1.4, player.y + player.r * 1.2, player.x - player.r * 4.2, player.y);
+  ctx.moveTo(-s * 0.22, s * 0.22);
+  ctx.lineTo(0, s * 1.38);
+  ctx.lineTo(s * 0.22, s * 0.22);
+  ctx.closePath();
   ctx.fill();
 
-  // main orb
+  // side glow
   ctx.shadowColor = C.cyan;
   ctx.shadowBlur = 26;
-  const orb = ctx.createRadialGradient(player.x - player.r * .35, player.y - player.r * .45, 2, player.x, player.y, player.r * 1.25);
-  orb.addColorStop(0, C.white);
-  orb.addColorStop(0.35, C.cyan);
-  orb.addColorStop(0.72, C.blue);
-  orb.addColorStop(1, "#08164A");
-
-  ctx.fillStyle = orb;
+  ctx.fillStyle = "rgba(0,245,255,.28)";
   ctx.beginPath();
-  ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2);
+  ctx.ellipse(0, s * 0.22, s * 0.9, s * 0.28, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // shine
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = "rgba(255,255,255,.9)";
+  // ship body
+  const body = ctx.createLinearGradient(-s * 0.5, -s, s * 0.5, s * 0.8);
+  body.addColorStop(0, C.white);
+  body.addColorStop(0.35, C.cyan);
+  body.addColorStop(1, C.blue);
+
+  ctx.fillStyle = body;
   ctx.beginPath();
-  ctx.arc(player.x + player.r * .32, player.y - player.r * .38, player.r * .16, 0, Math.PI * 2);
+  ctx.moveTo(0, -s * 0.95);
+  ctx.lineTo(s * 0.62, s * 0.72);
+  ctx.lineTo(0, s * 0.34);
+  ctx.lineTo(-s * 0.62, s * 0.72);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(255,255,255,.75)";
+  ctx.stroke();
+
+  // cockpit
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "rgba(5,11,46,.88)";
+  ctx.beginPath();
+  ctx.ellipse(0, -s * 0.24, s * 0.23, s * 0.31, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = C.gold;
+  ctx.beginPath();
+  ctx.arc(0, s * 0.18, s * 0.09, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.restore();
 }
 
-function drawObstacles() {
-  for (const o of obstacles) {
+function drawAsteroids() {
+  for (const a of asteroids) {
     ctx.save();
-    ctx.translate(o.x + o.w / 2, o.y + o.h / 2);
-    ctx.rotate(o.angle);
+    ctx.translate(a.x, a.y);
+    ctx.rotate(a.rot);
     ctx.shadowColor = C.danger;
-    ctx.shadowBlur = 24;
+    ctx.shadowBlur = 20;
 
-    const g = ctx.createLinearGradient(-o.w/2, -o.h/2, o.w/2, o.h/2);
-    g.addColorStop(0, C.danger);
+    const g = ctx.createRadialGradient(-a.r * .4, -a.r * .4, 2, 0, 0, a.r);
+    g.addColorStop(0, "#FF8AA5");
+    g.addColorStop(0.5, C.danger);
     g.addColorStop(1, C.purple);
     ctx.fillStyle = g;
 
     ctx.beginPath();
-    ctx.moveTo(0, -o.h / 2);
-    ctx.lineTo(o.w / 2, o.h / 2);
-    ctx.lineTo(-o.w / 2, o.h / 2);
+    for (let i = 0; i < a.sides; i++) {
+      const angle = Math.PI * 2 * i / a.sides;
+      const rr = a.r * randomSeeded(a.x + a.y + i, 0.72, 1.04);
+      const px = Math.cos(angle) * rr;
+      const py = Math.sin(angle) * rr;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
     ctx.closePath();
     ctx.fill();
 
-    ctx.strokeStyle = "rgba(255,255,255,.7)";
+    ctx.strokeStyle = "rgba(255,255,255,.55)";
     ctx.lineWidth = 2;
     ctx.stroke();
 
@@ -454,25 +443,25 @@ function drawObstacles() {
   }
 }
 
-function drawCoins() {
-  for (const c of coins) {
+function drawCollectibles() {
+  for (const c of starsToCollect) {
     ctx.save();
     ctx.translate(c.x, c.y);
-    ctx.rotate(c.spin);
+    ctx.rotate(c.rot);
     ctx.shadowColor = C.gold;
     ctx.shadowBlur = 22;
     ctx.fillStyle = C.gold;
 
     ctx.beginPath();
     for (let i = 0; i < 10; i++) {
-      const r = i % 2 === 0 ? c.r : c.r * .45;
+      const r = i % 2 === 0 ? c.r : c.r * 0.43;
       const a = Math.PI * 2 * i / 10 - Math.PI / 2;
       ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
     }
     ctx.closePath();
     ctx.fill();
 
-    ctx.strokeStyle = "rgba(255,255,255,.75)";
+    ctx.strokeStyle = "rgba(255,255,255,.72)";
     ctx.lineWidth = 2;
     ctx.stroke();
     ctx.restore();
@@ -481,10 +470,10 @@ function drawCoins() {
 
 function drawTip() {
   ctx.save();
-  ctx.globalAlpha = 0.6;
+  ctx.globalAlpha = 0.62;
   ctx.fillStyle = C.white;
   ctx.font = "14px system-ui, sans-serif";
-  ctx.fillText("Tap / Space to jump", 18, 28);
+  ctx.fillText("Drag / Arrow keys to move. Avoid asteroids. Collect stars.", 18, 28);
   ctx.restore();
 }
 
@@ -494,9 +483,9 @@ function burst(x, y, color, amount) {
       x,
       y,
       vx: random(-170, 170),
-      vy: random(-190, 70),
-      life: random(.35, .85),
-      max: .85,
+      vy: random(-190, 120),
+      life: random(0.35, 0.9),
+      max: 0.9,
       r: random(2, 5),
       color
     });
@@ -508,7 +497,7 @@ function updateParticles(dt) {
     p.life -= dt;
     p.x += p.vx * dt;
     p.y += p.vy * dt;
-    p.vy += 250 * dt;
+    p.vy += 220 * dt;
   }
   particles = particles.filter(p => p.life > 0);
 }
@@ -527,28 +516,79 @@ function drawParticles() {
   ctx.restore();
 }
 
-function random(min, max) { return Math.random() * (max - min) + min; }
-function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
-function lerp(a, b, t) { return a + (b - a) * t; }
+function moveBy(amount) {
+  if (state !== "playing") {
+    startGame();
+    return;
+  }
+  ship.targetX += amount;
+}
 
-window.addEventListener("resize", resize);
+function setShipFromPointer(e) {
+  const rect = canvas.getBoundingClientRect();
+  ship.targetX = clamp(e.clientX - rect.left, ship.size, W - ship.size);
+}
 
 document.addEventListener("keydown", (e) => {
-  if (["Space", "ArrowUp", "KeyW"].includes(e.code)) {
+  if (["ArrowLeft", "KeyA"].includes(e.code)) {
     e.preventDefault();
-    jump();
+    moveBy(-W * 0.09);
   }
-  if (e.code === "Enter" && state !== "playing") start();
-  if (e.code === "KeyR" && state === "over") start();
+  if (["ArrowRight", "KeyD"].includes(e.code)) {
+    e.preventDefault();
+    moveBy(W * 0.09);
+  }
+  if (["Space", "Enter"].includes(e.code) && state !== "playing") {
+    e.preventDefault();
+    startGame();
+  }
+  if (e.code === "KeyR" && state === "over") {
+    startGame();
+  }
 });
 
 canvas.parentElement.addEventListener("pointerdown", (e) => {
   e.preventDefault();
-  jump();
+  if (state !== "playing") {
+    startGame();
+    return;
+  }
+  dragging = true;
+  setShipFromPointer(e);
 });
 
-startBtn.addEventListener("click", start);
-restartBtn.addEventListener("click", start);
+canvas.parentElement.addEventListener("pointermove", (e) => {
+  if (!dragging || state !== "playing") return;
+  e.preventDefault();
+  setShipFromPointer(e);
+});
+
+canvas.parentElement.addEventListener("pointerup", () => {
+  dragging = false;
+});
+
+canvas.parentElement.addEventListener("pointercancel", () => {
+  dragging = false;
+});
+
+startBtn.addEventListener("click", startGame);
+restartBtn.addEventListener("click", startGame);
+
+function random(min, max) {
+  return Math.random() * (max - min) + min;
+}
+
+function randomSeeded(seed, min, max) {
+  const x = Math.sin(seed * 12.9898) * 43758.5453;
+  const n = x - Math.floor(x);
+  return min + n * (max - min);
+}
+
+function clamp(v, min, max) {
+  return Math.max(min, Math.min(max, v));
+}
+
+window.addEventListener("resize", resize);
 
 resize();
 draw();

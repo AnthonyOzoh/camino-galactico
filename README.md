@@ -1,37 +1,34 @@
-# Camino Galáctico - Final Clean Version
+# Camino Galáctico
 
-**Camino Galáctico** is a simple cosmic web runner game by **Nexora Games**, a subsidiary of **Ancherem Innovation LTD**.
+**Camino Galáctico** is a polished simple web space runner by **Nexora Games**, a subsidiary of **Ancherem Innovation LTD**.
 
 Tagline: **Play Beyond the Horizon**
 
-## Final Version Changes
-
-This version removes the strange character/ship design and uses a cleaner, more professional **glowing comet orb** as the player.
-
 ## Gameplay
 
-- Tap or press Space to jump
-- Avoid void crystals
+Control the Nexora craft through the galactic path.
+
+- Avoid asteroids
 - Collect golden stars
-- Try to beat your best score
+- Survive as long as possible
+- Beat your best score
 
 ## Controls
 
 Desktop:
 
-- Space / Arrow Up / W = Jump
-- Enter = Start
-- R = Restart
+- Left Arrow / A = move left
+- Right Arrow / D = move right
+- Enter / Space = start
+- R = restart after game over
 
 Mobile:
 
-- Tap anywhere to jump
+- Drag left and right to control the craft
 
-## Deployment
-
-Use Vercel with:
+## Deploy on Vercel
 
 - Application Preset: Other
 - Root Directory: ./
-- Build Command: empty
-- Output Directory: empty
+- Build Command: leave empty
+- Output Directory: leave empty
