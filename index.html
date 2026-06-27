@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#050B2E" />
+  <title>Camino Galáctico | Nexora Games</title>
+  <link rel="icon" href="assets/favicon.svg" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="game-page">
+    <section class="game-shell">
+      <header class="top-bar">
+        <div>
+          <p class="eyebrow">Nexora Games presents</p>
+          <h1>Camino Galáctico</h1>
+        </div>
+        <div class="score-card">
+          <span>Score</span>
+          <strong id="score">0</strong>
+        </div>
+      </header>
+
+      <div class="canvas-wrap">
+        <canvas id="gameCanvas" aria-label="Camino Galáctico game canvas"></canvas>
+
+        <div id="startScreen" class="overlay active">
+          <img src="assets/camino-galactico-logo.png" alt="Camino Galáctico logo" class="game-logo" onerror="this.style.display='none'" />
+          <h2>Camino Galáctico</h2>
+          <p>A simple cosmic runner by <strong>Nexora Games</strong>.</p>
+          <p class="small">Jump over obstacles, collect stars, and play beyond the horizon.</p>
+          <button id="startBtn">Start Game</button>
+          <p class="controls">Desktop: Space / ↑ to jump · Mobile: Tap to jump</p>
+        </div>
+
+        <div id="gameOverScreen" class="overlay">
+          <h2>Game Over</h2>
+          <p>Your Score: <strong id="finalScore">0</strong></p>
+          <p>High Score: <strong id="highScore">0</strong></p>
+          <button id="restartBtn">Run Again</button>
+          <p class="controls">Press R or tap Run Again</p>
+        </div>
+      </div>
+
+      <footer class="footer">
+        <span>Play Beyond the Horizon</span>
+        <span>Developed by Nexora Games · Parent Company: Ancherem Innovation LTD</span>
+      </footer>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
