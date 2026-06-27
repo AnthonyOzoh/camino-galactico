@@ -1,255 +1,294 @@
-// Camino Galáctico - Simple endless runner
-// Developed by Nexora Games
+// Camino Galáctico v2
+// A better mobile + desktop web runner by Nexora Games
 // Parent Company: Ancherem Innovation LTD
 
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
 const scoreEl = document.getElementById("score");
+const bestEl = document.getElementById("best");
 const finalScoreEl = document.getElementById("finalScore");
-const highScoreEl = document.getElementById("highScore");
+const finalBestEl = document.getElementById("finalBest");
+
 const startScreen = document.getElementById("startScreen");
 const gameOverScreen = document.getElementById("gameOverScreen");
 const startBtn = document.getElementById("startBtn");
 const restartBtn = document.getElementById("restartBtn");
 
-let width = 960;
-let height = 540;
-let groundY = 420;
-let scale = 1;
-let animationId = null;
-let lastTime = 0;
-let gameState = "start";
-
-let score = 0;
-let highScore = Number(localStorage.getItem("caminoGalacticoHighScore") || 0);
+const leftBtn = document.getElementById("leftBtn");
+const rightBtn = document.getElementById("rightBtn");
+const jumpBtn = document.getElementById("jumpBtn");
 
 const brand = {
   navy: "#050B2E",
-  navy2: "#08164A",
-  horizonBlue: "#1E7BFF",
+  blue: "#1E7BFF",
   cyan: "#00F5FF",
   gold: "#FFC857",
   white: "#F4F7FF",
-  danger: "#ff4d6d"
+  pink: "#FF3D7F"
 };
 
-const player = {
-  x: 110,
-  y: 0,
-  w: 44,
-  h: 58,
-  vy: 0,
-  gravity: 2100,
-  jumpPower: -760,
-  grounded: true
-};
+let W = 960;
+let H = 540;
+let DPR = 1;
 
-let obstacles = [];
-let orbs = [];
-let stars = [];
-let speed = 390;
+let state = "start";
+let last = 0;
+let raf = null;
+
+let score = 0;
+let best = Number(localStorage.getItem("caminoGalacticoBestV2") || 0);
+
+let lane = 1;
+let targetLane = 1;
+let playerX = 0;
+let jump = 0;
+let jumpVelocity = 0;
+let isJumping = false;
+
+let speed = 0.34;
 let spawnTimer = 0;
-let orbTimer = 0;
+let coinTimer = 0;
+let objects = [];
+let particles = [];
+let stars = [];
 
-function resizeCanvas() {
+bestEl.textContent = best;
+
+function resize() {
   const rect = canvas.parentElement.getBoundingClientRect();
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  canvas.width = Math.floor(rect.width * dpr);
-  canvas.height = Math.floor(rect.height * dpr);
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.floor(rect.width * DPR);
+  canvas.height = Math.floor(rect.height * DPR);
+  canvas.style.width = `${rect.width}px`;
+  canvas.style.height = `${rect.height}px`;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
-  width = rect.width;
-  height = rect.height;
-  scale = Math.min(width / 960, height / 540);
-  groundY = height * 0.78;
+  W = rect.width;
+  H = rect.height;
 
-  player.w = Math.max(34, 44 * scale);
-  player.h = Math.max(46, 58 * scale);
-  player.x = Math.max(58, width * 0.12);
-
-  if (gameState === "start" || gameState === "over") {
-    player.y = groundY - player.h;
-    draw();
-  }
+  createStars();
+  draw();
 }
 
-function resetGame() {
-  score = 0;
-  speed = Math.max(330, width * 0.42);
-  obstacles = [];
-  orbs = [];
-  spawnTimer = 0.8;
-  orbTimer = 1.2;
-  player.y = groundY - player.h;
-  player.vy = 0;
-  player.grounded = true;
-  scoreEl.textContent = "0";
+function createStars() {
+  stars = Array.from({ length: Math.floor(W / 9) }, () => ({
+    x: Math.random() * W,
+    y: Math.random() * H * 0.62,
+    r: Math.random() * 1.7 + 0.35,
+    a: Math.random() * 0.65 + 0.25,
+    v: Math.random() * 18 + 8
+  }));
 }
 
 function startGame() {
-  resetGame();
-  gameState = "playing";
+  state = "playing";
+  score = 0;
+  lane = 1;
+  targetLane = 1;
+  jump = 0;
+  jumpVelocity = 0;
+  isJumping = false;
+  speed = 0.34;
+  spawnTimer = 0.4;
+  coinTimer = 0.9;
+  objects = [];
+  particles = [];
+
   startScreen.classList.remove("active");
   gameOverScreen.classList.remove("active");
-  lastTime = performance.now();
-  cancelAnimationFrame(animationId);
-  animationId = requestAnimationFrame(loop);
+
+  last = performance.now();
+  cancelAnimationFrame(raf);
+  raf = requestAnimationFrame(loop);
 }
 
 function endGame() {
-  gameState = "over";
-  cancelAnimationFrame(animationId);
+  state = "over";
+  cancelAnimationFrame(raf);
 
-  highScore = Math.max(highScore, Math.floor(score));
-  localStorage.setItem("caminoGalacticoHighScore", String(highScore));
-
+  best = Math.max(best, Math.floor(score));
+  localStorage.setItem("caminoGalacticoBestV2", String(best));
+  bestEl.textContent = best;
   finalScoreEl.textContent = Math.floor(score);
-  highScoreEl.textContent = highScore;
+  finalBestEl.textContent = best;
+
   gameOverScreen.classList.add("active");
 }
 
-function jump() {
-  if (gameState === "start") {
-    startGame();
-    return;
-  }
-
-  if (gameState === "over") {
-    startGame();
-    return;
-  }
-
-  if (player.grounded) {
-    player.vy = player.jumpPower * Math.max(0.82, scale);
-    player.grounded = false;
-  }
-}
-
 function loop(now) {
-  const dt = Math.min((now - lastTime) / 1000, 0.033);
-  lastTime = now;
+  const dt = Math.min((now - last) / 1000, 0.034);
+  last = now;
 
   update(dt);
   draw();
 
-  if (gameState === "playing") {
-    animationId = requestAnimationFrame(loop);
-  }
+  if (state === "playing") raf = requestAnimationFrame(loop);
 }
 
 function update(dt) {
-  score += dt * 10;
-  speed += dt * 4;
+  score += dt * 18;
+  speed += dt * 0.006;
   scoreEl.textContent = Math.floor(score);
 
-  player.vy += player.gravity * dt;
-  player.y += player.vy * dt;
+  // Smooth lane movement
+  const desiredX = laneToX(targetLane, 1);
+  playerX += (desiredX - playerX) * Math.min(1, dt * 13);
 
-  if (player.y >= groundY - player.h) {
-    player.y = groundY - player.h;
-    player.vy = 0;
-    player.grounded = true;
+  // Jump physics
+  if (isJumping) {
+    jumpVelocity -= dt * 3.8;
+    jump += jumpVelocity * dt;
+    if (jump <= 0) {
+      jump = 0;
+      jumpVelocity = 0;
+      isJumping = false;
+    }
   }
 
   spawnTimer -= dt;
+  coinTimer -= dt;
+
   if (spawnTimer <= 0) {
     spawnObstacle();
-    spawnTimer = randomRange(1.05, 1.7) * Math.max(0.7, 390 / speed);
+    spawnTimer = Math.max(0.62, random(1.05, 1.45) - speed * 0.6);
   }
 
-  orbTimer -= dt;
-  if (orbTimer <= 0) {
-    spawnOrb();
-    orbTimer = randomRange(0.9, 1.45);
+  if (coinTimer <= 0) {
+    spawnCoin();
+    coinTimer = random(0.45, 0.78);
   }
 
-  obstacles.forEach(o => o.x -= speed * dt);
-  orbs.forEach(o => o.x -= speed * dt);
+  for (const obj of objects) {
+    obj.p += dt * (speed + obj.extraSpeed);
+    obj.spin += dt * 3.2;
+  }
 
-  obstacles = obstacles.filter(o => o.x + o.w > -40);
-  orbs = orbs.filter(o => !o.collected && o.x + o.r > -40);
-
-  for (const obstacle of obstacles) {
-    if (rectsCollide(player, obstacle)) {
-      endGame();
-      return;
+  for (const s of stars) {
+    s.y += s.v * dt * 0.25;
+    if (s.y > H * 0.64) {
+      s.y = -4;
+      s.x = Math.random() * W;
     }
   }
 
-  for (const orb of orbs) {
-    if (circleRectCollide(orb, player)) {
-      orb.collected = true;
-      score += 25;
-      scoreEl.textContent = Math.floor(score);
-    }
-  }
+  updateParticles(dt);
+  checkCollisions();
 
-  stars.forEach(s => {
-    s.x -= s.speed * dt;
-    if (s.x < 0) {
-      s.x = width + Math.random() * 80;
-      s.y = Math.random() * height * 0.55;
-    }
-  });
+  objects = objects.filter(obj => obj.p < 1.22 && !obj.dead);
 }
 
 function spawnObstacle() {
-  const size = randomRange(34, 58) * Math.max(0.85, scale);
-  obstacles.push({
-    x: width + 20,
-    y: groundY - size,
-    w: size,
-    h: size,
-    glow: Math.random()
+  const chosenLane = Math.floor(Math.random() * 3);
+  objects.push({
+    type: "block",
+    lane: chosenLane,
+    p: -0.05,
+    spin: Math.random() * 6,
+    extraSpeed: 0
   });
 }
 
-function spawnOrb() {
-  const jumpHeight = randomRange(70, 145) * Math.max(0.8, scale);
-  orbs.push({
-    x: width + 30,
-    y: groundY - jumpHeight,
-    r: Math.max(10, 14 * scale),
-    collected: false,
-    pulse: Math.random() * Math.PI * 2
+function spawnCoin() {
+  const chosenLane = Math.floor(Math.random() * 3);
+  objects.push({
+    type: "coin",
+    lane: chosenLane,
+    p: -0.08,
+    spin: Math.random() * 6,
+    extraSpeed: 0.02
   });
 }
 
-function createStars() {
-  stars = Array.from({ length: 70 }, () => ({
-    x: Math.random() * width,
-    y: Math.random() * height * 0.62,
-    r: Math.random() * 1.8 + 0.4,
-    speed: Math.random() * 28 + 8,
-    alpha: Math.random() * 0.65 + 0.25
-  }));
-}
-
-function draw() {
-  drawBackground();
-  drawHorizon();
-  drawGround();
-  drawOrbs();
-  drawObstacles();
-  drawPlayer();
-
-  if (gameState === "playing") {
-    drawMiniTip();
+function checkCollisions() {
+  for (const obj of objects) {
+    if (obj.p > 0.78 && obj.p < 1.02 && obj.lane === targetLane) {
+      if (obj.type === "block") {
+        if (jump < 0.36) {
+          burst(playerX, playerY(), brand.pink, 22);
+          endGame();
+          return;
+        }
+      } else if (obj.type === "coin" && !obj.dead) {
+        obj.dead = true;
+        score += 45;
+        burst(laneToX(obj.lane, obj.p), roadY(obj.p), brand.gold, 14);
+      }
+    }
   }
 }
 
-function drawBackground() {
-  const gradient = ctx.createLinearGradient(0, 0, 0, height);
-  gradient.addColorStop(0, "#020617");
-  gradient.addColorStop(0.5, brand.navy);
-  gradient.addColorStop(1, "#020817");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, width, height);
+function moveLeft() {
+  if (state === "start") return startGame();
+  if (state === "over") return startGame();
+  targetLane = Math.max(0, targetLane - 1);
+}
+
+function moveRight() {
+  if (state === "start") return startGame();
+  if (state === "over") return startGame();
+  targetLane = Math.min(2, targetLane + 1);
+}
+
+function doJump() {
+  if (state === "start") return startGame();
+  if (state === "over") return startGame();
+
+  if (!isJumping) {
+    isJumping = true;
+    jumpVelocity = 1.38;
+    burst(playerX, playerY() + 28, brand.cyan, 8);
+  }
+}
+
+function roadY(p) {
+  const horizon = H * 0.29;
+  return horizon + Math.pow(p, 1.7) * (H * 0.68);
+}
+
+function roadWidth(p) {
+  return (W * 0.08) + Math.pow(p, 1.45) * (W * 0.66);
+}
+
+function laneToX(l, p) {
+  const center = W * 0.5;
+  const half = roadWidth(p) * 0.38;
+  const laneOffset = [-half, 0, half][l];
+  return center + laneOffset;
+}
+
+function playerY() {
+  return H * 0.79 - jump * H * 0.22;
+}
+
+function draw() {
+  drawSpace();
+  drawRoad();
+  drawObjects();
+  drawPlayer();
+  drawParticles();
+
+  if (state === "playing") drawHelp();
+}
+
+function drawSpace() {
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, "#020617");
+  bg.addColorStop(0.45, "#050B2E");
+  bg.addColorStop(1, "#020817");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  const nebula = ctx.createRadialGradient(W * 0.68, H * 0.22, 0, W * 0.68, H * 0.22, W * 0.56);
+  nebula.addColorStop(0, "rgba(0,245,255,0.18)");
+  nebula.addColorStop(0.35, "rgba(30,123,255,0.08)");
+  nebula.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = nebula;
+  ctx.fillRect(0, 0, W, H);
 
   ctx.save();
   for (const s of stars) {
-    ctx.globalAlpha = s.alpha;
+    ctx.globalAlpha = s.a;
     ctx.fillStyle = brand.white;
     ctx.beginPath();
     ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
@@ -257,241 +296,248 @@ function drawBackground() {
   }
   ctx.restore();
 
-  const glow = ctx.createRadialGradient(width * 0.72, height * 0.2, 5, width * 0.72, height * 0.2, width * 0.65);
-  glow.addColorStop(0, "rgba(0,245,255,0.18)");
-  glow.addColorStop(0.4, "rgba(30,123,255,0.08)");
-  glow.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, width, height);
-}
-
-function drawHorizon() {
-  const horizonY = groundY - height * 0.23;
-
+  // Horizon curve
+  const hy = H * 0.33;
   ctx.save();
-  ctx.strokeStyle = "rgba(255, 200, 87, 0.75)";
-  ctx.lineWidth = Math.max(2, 3 * scale);
+  ctx.strokeStyle = "rgba(255,200,87,0.9)";
+  ctx.lineWidth = 3;
   ctx.shadowColor = brand.gold;
   ctx.shadowBlur = 18;
   ctx.beginPath();
-  ctx.moveTo(0, horizonY);
-  ctx.quadraticCurveTo(width * 0.5, horizonY - 55 * scale, width, horizonY);
+  ctx.moveTo(-40, hy + 20);
+  ctx.quadraticCurveTo(W * 0.5, hy - 20, W + 40, hy + 20);
   ctx.stroke();
 
-  ctx.fillStyle = "rgba(255, 200, 87, 0.9)";
-  ctx.shadowBlur = 28;
+  ctx.fillStyle = brand.gold;
   ctx.beginPath();
-  ctx.arc(width * 0.76, horizonY - 14 * scale, 6 * scale + 3, 0, Math.PI * 2);
+  ctx.arc(W * 0.73, hy + 6, 8, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }
 
-function drawGround() {
+function drawRoad() {
+  const horizon = H * 0.36;
+  const bottom = H * 1.04;
+  const center = W * 0.5;
+  const bottomHalf = W * 0.43;
+
   ctx.save();
 
-  const roadGradient = ctx.createLinearGradient(0, groundY, width, height);
-  roadGradient.addColorStop(0, "rgba(30,123,255,0.18)");
-  roadGradient.addColorStop(0.5, "rgba(0,245,255,0.34)");
-  roadGradient.addColorStop(1, "rgba(255,200,87,0.16)");
+  const roadGrad = ctx.createLinearGradient(0, horizon, W, bottom);
+  roadGrad.addColorStop(0, "rgba(0,245,255,0.05)");
+  roadGrad.addColorStop(0.45, "rgba(0,245,255,0.18)");
+  roadGrad.addColorStop(1, "rgba(255,200,87,0.13)");
 
-  ctx.fillStyle = roadGradient;
+  ctx.fillStyle = roadGrad;
   ctx.beginPath();
-  ctx.moveTo(0, height);
-  ctx.lineTo(width * 0.42, groundY);
-  ctx.lineTo(width * 0.58, groundY);
-  ctx.lineTo(width, height);
+  ctx.moveTo(center - W * 0.035, horizon);
+  ctx.lineTo(center + W * 0.035, horizon);
+  ctx.lineTo(center + bottomHalf, bottom);
+  ctx.lineTo(center - bottomHalf, bottom);
   ctx.closePath();
   ctx.fill();
 
-  ctx.strokeStyle = "rgba(0,245,255,0.72)";
-  ctx.lineWidth = Math.max(2, 3 * scale);
   ctx.shadowColor = brand.cyan;
-  ctx.shadowBlur = 14;
+  ctx.shadowBlur = 16;
+  ctx.lineWidth = 2;
 
-  for (let i = 0; i < 5; i++) {
-    const offset = (i - 2) * width * 0.08;
+  // lane lines
+  for (let i = -3; i <= 3; i++) {
+    const offset = i / 3;
+    ctx.strokeStyle = i === 0 ? "rgba(0,245,255,0.9)" : "rgba(0,245,255,0.45)";
     ctx.beginPath();
-    ctx.moveTo(width * 0.5 + offset * 0.15, groundY);
-    ctx.lineTo(width * 0.5 + offset, height);
+    ctx.moveTo(center + offset * W * 0.025, horizon);
+    ctx.lineTo(center + offset * bottomHalf, bottom);
     ctx.stroke();
   }
 
-  ctx.strokeStyle = "rgba(244,247,255,0.18)";
-  ctx.lineWidth = 1;
-  for (let y = groundY; y < height; y += 34 * scale) {
+  // cross lines
+  ctx.shadowBlur = 4;
+  for (let p = 0.08; p <= 1.06; p += 0.09) {
+    const y = roadY(p);
+    const half = roadWidth(p) * 0.52;
+    ctx.strokeStyle = "rgba(244,247,255,0.15)";
     ctx.beginPath();
-    ctx.moveTo(width * 0.36 - (y - groundY) * 0.65, y);
-    ctx.lineTo(width * 0.64 + (y - groundY) * 0.65, y);
+    ctx.moveTo(center - half, y);
+    ctx.lineTo(center + half, y);
     ctx.stroke();
   }
 
+  ctx.restore();
+}
+
+function drawObjects() {
+  const sorted = [...objects].sort((a, b) => a.p - b.p);
+
+  for (const obj of sorted) {
+    const p = obj.p;
+    if (p < 0 || p > 1.16) continue;
+
+    const x = laneToX(obj.lane, p);
+    const y = roadY(p);
+    const size = 12 + Math.pow(p, 1.45) * 72;
+
+    if (obj.type === "block") drawVoidBlock(x, y, size, obj.spin);
+    if (obj.type === "coin") drawStarCoin(x, y, size * 0.34, obj.spin);
+  }
+}
+
+function drawVoidBlock(x, y, size, spin) {
+  ctx.save();
+  ctx.translate(x, y - size * 0.55);
+  ctx.rotate(Math.sin(spin) * 0.06);
+  ctx.shadowColor = brand.pink;
+  ctx.shadowBlur = 22;
+
+  const g = ctx.createLinearGradient(-size / 2, -size / 2, size / 2, size / 2);
+  g.addColorStop(0, "#FF3D7F");
+  g.addColorStop(1, "#8A2CFF");
+  ctx.fillStyle = g;
+
+  roundRect(-size / 2, -size / 2, size, size, size * 0.16);
+  ctx.fill();
+
+  ctx.lineWidth = Math.max(2, size * 0.04);
+  ctx.strokeStyle = "rgba(255,255,255,0.65)";
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawStarCoin(x, y, r, spin) {
+  ctx.save();
+  ctx.translate(x, y - r * 2.2);
+  ctx.rotate(spin);
+  ctx.shadowColor = brand.gold;
+  ctx.shadowBlur = 22;
+  ctx.fillStyle = brand.gold;
+
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const rr = i % 2 === 0 ? r : r * 0.42;
+    const a = (Math.PI * 2 * i) / 10 - Math.PI / 2;
+    ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(255,255,255,0.7)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
   ctx.restore();
 }
 
 function drawPlayer() {
-  const x = player.x;
-  const y = player.y;
-  const w = player.w;
-  const h = player.h;
+  const px = playerX || laneToX(targetLane, 1);
+  const py = playerY();
+  const size = Math.min(88, Math.max(62, W * 0.09));
 
   ctx.save();
+  ctx.translate(px, py);
 
-  // Soft cyan glow around the runner
-  ctx.shadowColor = brand.cyan;
-  ctx.shadowBlur = 22;
-
-  // Jet flame / speed trail
-  ctx.fillStyle = "rgba(255, 200, 87, 0.95)";
+  // shadow on road
+  ctx.globalAlpha = 0.35;
+  ctx.fillStyle = "rgba(0,245,255,0.5)";
   ctx.beginPath();
-  ctx.moveTo(x - w * 0.15, y + h * 0.58);
-  ctx.lineTo(x - w * 0.55, y + h * 0.43);
-  ctx.lineTo(x - w * 0.18, y + h * 0.30);
+  ctx.ellipse(0, size * 0.46, size * 0.62, size * 0.16, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // flame
+  ctx.shadowColor = brand.gold;
+  ctx.shadowBlur = 20;
+  ctx.fillStyle = brand.gold;
+  ctx.beginPath();
+  ctx.moveTo(-size * 0.52, size * 0.1);
+  ctx.lineTo(-size * 0.95, 0);
+  ctx.lineTo(-size * 0.52, -size * 0.1);
   ctx.closePath();
   ctx.fill();
 
-  ctx.fillStyle = "rgba(0, 245, 255, 0.38)";
-  ctx.beginPath();
-  ctx.ellipse(x - w * 0.26, y + h * 0.48, w * 0.45, h * 0.18, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Helmet
-  const helmetGradient = ctx.createLinearGradient(x, y, x + w, y + h * 0.55);
-  helmetGradient.addColorStop(0, "#F4F7FF");
-  helmetGradient.addColorStop(0.45, brand.cyan);
-  helmetGradient.addColorStop(1, brand.horizonBlue);
-
-  ctx.fillStyle = helmetGradient;
-  ctx.beginPath();
-  ctx.arc(x + w * 0.52, y + h * 0.24, w * 0.36, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Helmet glass
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = "rgba(5, 11, 46, 0.88)";
-  ctx.beginPath();
-  ctx.ellipse(x + w * 0.63, y + h * 0.22, w * 0.18, h * 0.11, -0.2, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = "rgba(244, 247, 255, 0.8)";
-  ctx.beginPath();
-  ctx.arc(x + w * 0.69, y + h * 0.17, Math.max(1.8, 2.8 * scale), 0, Math.PI * 2);
-  ctx.fill();
-
-  // Body suit
+  // hover-runner body
   ctx.shadowColor = brand.cyan;
-  ctx.shadowBlur = 14;
+  ctx.shadowBlur = 24;
+  const body = ctx.createLinearGradient(-size * 0.5, -size * 0.25, size * 0.5, size * 0.25);
+  body.addColorStop(0, brand.cyan);
+  body.addColorStop(0.55, brand.blue);
+  body.addColorStop(1, brand.white);
 
-  const suitGradient = ctx.createLinearGradient(x, y + h * 0.35, x + w, y + h);
-  suitGradient.addColorStop(0, brand.cyan);
-  suitGradient.addColorStop(0.7, brand.horizonBlue);
-  suitGradient.addColorStop(1, "#0B2B7A");
-
-  ctx.fillStyle = suitGradient;
-  roundRect(x + w * 0.20, y + h * 0.42, w * 0.56, h * 0.36, 9 * scale);
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.moveTo(-size * 0.52, 0);
+  ctx.quadraticCurveTo(-size * 0.18, -size * 0.34, size * 0.45, -size * 0.25);
+  ctx.quadraticCurveTo(size * 0.68, 0, size * 0.45, size * 0.25);
+  ctx.quadraticCurveTo(-size * 0.18, size * 0.34, -size * 0.52, 0);
+  ctx.closePath();
   ctx.fill();
 
-  // Chest light
+  // cockpit
   ctx.shadowBlur = 0;
+  ctx.fillStyle = "rgba(5,11,46,0.88)";
+  ctx.beginPath();
+  ctx.ellipse(size * 0.21, -size * 0.03, size * 0.22, size * 0.14, -0.08, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(244,247,255,0.9)";
+  ctx.beginPath();
+  ctx.arc(size * 0.30, -size * 0.09, size * 0.035, 0, Math.PI * 2);
+  ctx.fill();
+
+  // bottom light
   ctx.fillStyle = brand.gold;
   ctx.beginPath();
-  ctx.arc(x + w * 0.52, y + h * 0.56, Math.max(2.5, 4 * scale), 0, Math.PI * 2);
-  ctx.fill();
-
-  // Arm
-  ctx.strokeStyle = brand.white;
-  ctx.lineWidth = Math.max(3, 5 * scale);
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  ctx.moveTo(x + w * 0.25, y + h * 0.50);
-  ctx.lineTo(x + w * 0.05, y + h * 0.64);
-  ctx.stroke();
-
-  // Legs
-  ctx.strokeStyle = brand.cyan;
-  ctx.lineWidth = Math.max(4, 6 * scale);
-  ctx.beginPath();
-  ctx.moveTo(x + w * 0.38, y + h * 0.76);
-  ctx.lineTo(x + w * 0.22, y + h * 0.98);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(x + w * 0.64, y + h * 0.76);
-  ctx.lineTo(x + w * 0.82, y + h * 0.96);
-  ctx.stroke();
-
-  // Boots
-  ctx.fillStyle = brand.white;
-  roundRect(x + w * 0.12, y + h * 0.94, w * 0.24, h * 0.08, 5 * scale);
-  ctx.fill();
-  roundRect(x + w * 0.72, y + h * 0.92, w * 0.26, h * 0.08, 5 * scale);
+  ctx.arc(0, size * 0.22, size * 0.05, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.restore();
 }
 
-function drawObstacles() {
-  for (const o of obstacles) {
-    ctx.save();
-    ctx.shadowColor = brand.danger;
-    ctx.shadowBlur = 18;
-    ctx.fillStyle = "rgba(255,77,109,0.88)";
-    roundRect(o.x, o.y, o.w, o.h, 9 * scale);
-    ctx.fill();
-
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = "rgba(255,255,255,0.35)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    ctx.restore();
-  }
-}
-
-function drawOrbs() {
-  for (const o of orbs) {
-    ctx.save();
-    const pulse = 1 + Math.sin(performance.now() / 180 + o.pulse) * 0.12;
-    ctx.shadowColor = brand.gold;
-    ctx.shadowBlur = 22;
-    ctx.fillStyle = brand.gold;
-    ctx.beginPath();
-    ctx.arc(o.x, o.y, o.r * pulse, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = "rgba(255,255,255,0.72)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(o.x, o.y, o.r * 1.55 * pulse, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-  }
-}
-
-function drawMiniTip() {
+function drawHelp() {
   ctx.save();
-  ctx.globalAlpha = 0.72;
+  ctx.globalAlpha = 0.66;
   ctx.fillStyle = brand.white;
-  ctx.font = `${Math.max(12, 14 * scale)}px system-ui, sans-serif`;
-  ctx.fillText("Tap / Space to jump", 18, height - 22);
+  ctx.font = "14px system-ui, sans-serif";
+  ctx.fillText("Move lanes. Jump over void blocks. Collect stars.", 18, 28);
   ctx.restore();
 }
 
-function rectsCollide(a, b) {
-  const padding = 7 * scale;
-  return (
-    a.x + padding < b.x + b.w &&
-    a.x + a.w - padding > b.x &&
-    a.y + padding < b.y + b.h &&
-    a.y + a.h - padding > b.y
-  );
+function burst(x, y, color, amount) {
+  for (let i = 0; i < amount; i++) {
+    particles.push({
+      x,
+      y,
+      vx: random(-150, 150),
+      vy: random(-150, 80),
+      life: random(0.3, 0.75),
+      max: 0.75,
+      color,
+      r: random(2, 5)
+    });
+  }
 }
 
-function circleRectCollide(circle, rect) {
-  const closestX = clamp(circle.x, rect.x, rect.x + rect.w);
-  const closestY = clamp(circle.y, rect.y, rect.y + rect.h);
-  const dx = circle.x - closestX;
-  const dy = circle.y - closestY;
-  return dx * dx + dy * dy < circle.r * circle.r;
+function updateParticles(dt) {
+  for (const p of particles) {
+    p.life -= dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vy += 220 * dt;
+  }
+  particles = particles.filter(p => p.life > 0);
+}
+
+function drawParticles() {
+  ctx.save();
+  for (const p of particles) {
+    ctx.globalAlpha = Math.max(0, p.life / p.max);
+    ctx.fillStyle = p.color;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 function roundRect(x, y, w, h, r) {
@@ -505,44 +551,58 @@ function roundRect(x, y, w, h, r) {
   ctx.closePath();
 }
 
-function randomRange(min, max) {
+function random(min, max) {
   return Math.random() * (max - min) + min;
 }
 
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
+window.addEventListener("resize", resize);
 
-window.addEventListener("resize", () => {
-  resizeCanvas();
-  createStars();
+document.addEventListener("keydown", (e) => {
+  if (["ArrowLeft", "KeyA"].includes(e.code)) {
+    e.preventDefault();
+    moveLeft();
+  }
+  if (["ArrowRight", "KeyD"].includes(e.code)) {
+    e.preventDefault();
+    moveRight();
+  }
+  if (["ArrowUp", "Space", "KeyW"].includes(e.code)) {
+    e.preventDefault();
+    doJump();
+  }
+  if (e.code === "Enter" && state !== "playing") startGame();
+  if (e.code === "KeyR" && state === "over") startGame();
 });
 
-document.addEventListener("keydown", (event) => {
-  if (event.code === "Space" || event.code === "ArrowUp") {
-    event.preventDefault();
-    jump();
-  }
-
-  if (event.key.toLowerCase() === "r" && gameState === "over") {
-    startGame();
-  }
-
-  if (event.key === "Enter" && gameState === "start") {
-    startGame();
-  }
-});
-
-canvas.parentElement.addEventListener("pointerdown", (event) => {
-  event.preventDefault();
-  jump();
-});
+leftBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); moveLeft(); });
+rightBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); moveRight(); });
+jumpBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); doJump(); });
 
 startBtn.addEventListener("click", startGame);
 restartBtn.addEventListener("click", startGame);
 
-resizeCanvas();
-createStars();
-player.y = groundY - player.h;
-highScoreEl.textContent = highScore;
+// Swipe support
+let touchStartX = 0;
+let touchStartY = 0;
+
+canvas.addEventListener("pointerdown", (e) => {
+  touchStartX = e.clientX;
+  touchStartY = e.clientY;
+});
+
+canvas.addEventListener("pointerup", (e) => {
+  const dx = e.clientX - touchStartX;
+  const dy = e.clientY - touchStartY;
+
+  if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) {
+    dx < 0 ? moveLeft() : moveRight();
+  } else if (Math.abs(dy) > 45 && dy < 0) {
+    doJump();
+  } else if (state !== "playing") {
+    startGame();
+  }
+});
+
+resize();
+playerX = laneToX(1, 1);
 draw();

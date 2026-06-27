@@ -1,51 +1,54 @@
-# Camino Galáctico
+# Camino Galáctico v2
 
-**Camino Galáctico** is a simple mobile and desktop web runner game by **Nexora Games**, a subsidiary of **Ancherem Innovation LTD**.
+**Camino Galáctico** is a mobile and desktop web runner game by **Nexora Games**, a subsidiary of **Ancherem Innovation LTD**.
 
 Tagline: **Play Beyond the Horizon**
 
-## Gameplay
+## What changed in v2
 
-Jump over obstacles, collect stars, and survive for as long as possible.
+This version replaces the older basic runner with a better lane-runner style:
+
+- better gameplay
+- better player design
+- 3-lane movement
+- mobile controls
+- desktop controls
+- better road perspective
+- collectible stars
+- glowing obstacles
+- high score saving
 
 ## Controls
 
 Desktop:
 
-- `Space` or `Arrow Up` = Jump
-- `Enter` = Start
-- `R` = Restart after game over
+- Left/Right Arrow or A/D = Move lanes
+- Space / Arrow Up / W = Jump
+- Enter = Start
+- R = Restart after game over
 
 Mobile:
 
-- Tap the screen to jump
-- Tap buttons to start or restart
+- Left button = Move left
+- Right button = Move right
+- Jump button = Jump
+- Swipe left/right also works
+- Swipe up jumps
 
 ## Files
 
-- `index.html` — main game page
-- `style.css` — design and responsive layout
-- `script.js` — game logic
-- `assets/camino-galactico-logo.png` — game logo
+- `index.html`
+- `style.css`
+- `script.js`
+- `README.md`
+- `assets/camino-galactico-logo.png`
+- `assets/favicon.svg`
 
-## How to Deploy on Vercel
+## Deploy on Vercel
 
-1. Create a new GitHub repository.
-2. Upload all the files in this folder.
-3. Go to Vercel.
-4. Choose **New Project**.
-5. Import your GitHub repository.
-6. Use the default settings.
-7. Click **Deploy**.
+Use the default Vercel settings.
 
-No build command is needed because this is a simple HTML/CSS/JavaScript game.
-
-## Brand Credits
-
-Developed by **Nexora Games**  
-Parent Company: **Ancherem Innovation LTD**
-
-
-## Version 1.1
-
-Updated the player character from a simple block into a small cosmic runner/astronaut.
+- Framework/Application Preset: **Other**
+- Root Directory: `./`
+- Build Command: leave empty
+- Output Directory: leave empty

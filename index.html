@@ -9,42 +9,54 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <main class="game-page">
-    <section class="game-shell">
-      <header class="top-bar">
+  <main class="app">
+    <section class="game-card">
+      <header class="hud">
         <div>
-          <p class="eyebrow">Nexora Games presents</p>
+          <p>Nexora Games presents</p>
           <h1>Camino Galáctico</h1>
         </div>
-        <div class="score-card">
-          <span>Score</span>
-          <strong id="score">0</strong>
+
+        <div class="stats">
+          <div>
+            <span>Score</span>
+            <strong id="score">0</strong>
+          </div>
+          <div>
+            <span>Best</span>
+            <strong id="best">0</strong>
+          </div>
         </div>
       </header>
 
-      <div class="canvas-wrap">
-        <canvas id="gameCanvas" aria-label="Camino Galáctico game canvas"></canvas>
+      <div class="stage" id="stage">
+        <canvas id="gameCanvas"></canvas>
 
-        <div id="startScreen" class="overlay active">
-          <img src="assets/camino-galactico-logo.png" alt="Camino Galáctico logo" class="game-logo" onerror="this.style.display='none'" />
+        <div class="overlay active" id="startScreen">
+          <img class="logo" src="assets/camino-galactico-logo.png" alt="Camino Galáctico Logo" onerror="this.style.display='none'" />
           <h2>Camino Galáctico</h2>
-          <p>A simple cosmic runner by <strong>Nexora Games</strong>.</p>
-          <p class="small">Jump over obstacles, collect stars, and play beyond the horizon.</p>
-          <button id="startBtn">Start Game</button>
-          <p class="controls">Desktop: Space / ↑ to jump · Mobile: Tap to jump</p>
+          <p class="tagline">Run the cosmic road. Collect stars. Dodge void blocks.</p>
+          <button id="startBtn">Start Run</button>
+          <p class="hint">Desktop: ← → to move · Space to jump</p>
+          <p class="hint">Mobile: use the buttons below</p>
         </div>
 
-        <div id="gameOverScreen" class="overlay">
-          <h2>Game Over</h2>
+        <div class="overlay" id="gameOverScreen">
+          <h2>Run Ended</h2>
           <p>Your Score: <strong id="finalScore">0</strong></p>
-          <p>High Score: <strong id="highScore">0</strong></p>
+          <p>Best Score: <strong id="finalBest">0</strong></p>
           <button id="restartBtn">Run Again</button>
-          <p class="controls">Press R or tap Run Again</p>
+        </div>
+
+        <div class="mobile-controls" aria-label="Mobile controls">
+          <button id="leftBtn">←</button>
+          <button id="jumpBtn">Jump</button>
+          <button id="rightBtn">→</button>
         </div>
       </div>
 
-      <footer class="footer">
-        <span>Play Beyond the Horizon</span>
+      <footer>
+        <strong>Play Beyond the Horizon</strong>
         <span>Developed by Nexora Games · Parent Company: Ancherem Innovation LTD</span>
       </footer>
     </section>
