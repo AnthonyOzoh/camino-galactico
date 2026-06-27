@@ -9,49 +9,37 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <main class="app">
-    <section class="game-card">
-      <header class="hud">
+  <main class="page">
+    <section class="shell">
+      <header class="header">
         <div>
           <p>Nexora Games presents</p>
           <h1>Camino Galáctico</h1>
         </div>
-
-        <div class="stats">
-          <div>
-            <span>Score</span>
-            <strong id="score">0</strong>
-          </div>
-          <div>
-            <span>Best</span>
-            <strong id="best">0</strong>
-          </div>
+        <div class="scores">
+          <div><span>Score</span><strong id="score">0</strong></div>
+          <div><span>Best</span><strong id="best">0</strong></div>
         </div>
       </header>
 
-      <div class="stage" id="stage">
-        <canvas id="gameCanvas"></canvas>
+      <div class="game-wrap">
+        <canvas id="game"></canvas>
 
         <div class="overlay active" id="startScreen">
-          <img class="logo" src="assets/camino-galactico-logo.png" alt="Camino Galáctico Logo" onerror="this.style.display='none'" />
+          <img src="assets/camino-galactico-logo.png" alt="Camino Galáctico logo" onerror="this.style.display='none'" />
           <h2>Camino Galáctico</h2>
-          <p class="tagline">Run the cosmic road. Collect stars. Dodge void blocks.</p>
-          <button id="startBtn">Start Run</button>
-          <p class="hint">Desktop: ← → to move · Space to jump</p>
-          <p class="hint">Mobile: use the buttons below</p>
+          <p>A clean cosmic runner by <strong>Nexora Games</strong>.</p>
+          <p class="muted">Jump over void crystals. Collect golden stars. Survive the galactic path.</p>
+          <button id="startBtn">Start Game</button>
+          <small>Mobile: tap to jump · Desktop: Space / Arrow Up</small>
         </div>
 
         <div class="overlay" id="gameOverScreen">
-          <h2>Run Ended</h2>
+          <h2>Game Over</h2>
           <p>Your Score: <strong id="finalScore">0</strong></p>
           <p>Best Score: <strong id="finalBest">0</strong></p>
-          <button id="restartBtn">Run Again</button>
-        </div>
-
-        <div class="mobile-controls" aria-label="Mobile controls">
-          <button id="leftBtn">←</button>
-          <button id="jumpBtn">Jump</button>
-          <button id="rightBtn">→</button>
+          <button id="restartBtn">Play Again</button>
+          <small>Tap or press Space to restart</small>
         </div>
       </div>
 
@@ -61,7 +49,6 @@
       </footer>
     </section>
   </main>
-
   <script src="script.js"></script>
 </body>
 </html>

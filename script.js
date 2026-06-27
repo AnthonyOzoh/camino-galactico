@@ -1,8 +1,8 @@
-// Camino Galáctico v2
-// A better mobile + desktop web runner by Nexora Games
+// Camino Galáctico Final
+// Clean cosmic runner by Nexora Games
 // Parent Company: Ancherem Innovation LTD
 
-const canvas = document.getElementById("gameCanvas");
+const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
 const scoreEl = document.getElementById("score");
@@ -15,109 +15,116 @@ const gameOverScreen = document.getElementById("gameOverScreen");
 const startBtn = document.getElementById("startBtn");
 const restartBtn = document.getElementById("restartBtn");
 
-const leftBtn = document.getElementById("leftBtn");
-const rightBtn = document.getElementById("rightBtn");
-const jumpBtn = document.getElementById("jumpBtn");
-
-const brand = {
+const C = {
   navy: "#050B2E",
   blue: "#1E7BFF",
   cyan: "#00F5FF",
   gold: "#FFC857",
   white: "#F4F7FF",
-  pink: "#FF3D7F"
+  danger: "#FF3D7F",
+  purple: "#8A2CFF"
 };
 
 let W = 960;
 let H = 540;
 let DPR = 1;
-
 let state = "start";
-let last = 0;
 let raf = null;
+let last = 0;
 
 let score = 0;
-let best = Number(localStorage.getItem("caminoGalacticoBestV2") || 0);
+let best = Number(localStorage.getItem("caminoGalacticoCleanBest") || 0);
+bestEl.textContent = best;
 
-let lane = 1;
-let targetLane = 1;
-let playerX = 0;
-let jump = 0;
-let jumpVelocity = 0;
-let isJumping = false;
+const player = {
+  x: 120,
+  y: 0,
+  r: 24,
+  vy: 0,
+  grounded: true,
+  trail: []
+};
 
-let speed = 0.34;
+let ground = 0;
+let speed = 420;
+let obstacles = [];
+let coins = [];
+let stars = [];
+let particles = [];
 let spawnTimer = 0;
 let coinTimer = 0;
-let objects = [];
-let particles = [];
-let stars = [];
-
-bestEl.textContent = best;
+let roadOffset = 0;
 
 function resize() {
   const rect = canvas.parentElement.getBoundingClientRect();
   DPR = Math.min(window.devicePixelRatio || 1, 2);
   canvas.width = Math.floor(rect.width * DPR);
   canvas.height = Math.floor(rect.height * DPR);
-  canvas.style.width = `${rect.width}px`;
-  canvas.style.height = `${rect.height}px`;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
   W = rect.width;
   H = rect.height;
+  ground = H * 0.76;
 
-  createStars();
-  draw();
-}
+  player.x = Math.max(82, W * 0.16);
+  player.r = Math.max(18, Math.min(28, W * 0.035));
+  if (state !== "playing") {
+    player.y = ground - player.r;
+  }
 
-function createStars() {
   stars = Array.from({ length: Math.floor(W / 9) }, () => ({
     x: Math.random() * W,
-    y: Math.random() * H * 0.62,
+    y: Math.random() * H * 0.55,
     r: Math.random() * 1.7 + 0.35,
     a: Math.random() * 0.65 + 0.25,
     v: Math.random() * 18 + 8
   }));
+
+  draw();
 }
 
-function startGame() {
-  state = "playing";
+function reset() {
   score = 0;
-  lane = 1;
-  targetLane = 1;
-  jump = 0;
-  jumpVelocity = 0;
-  isJumping = false;
-  speed = 0.34;
-  spawnTimer = 0.4;
-  coinTimer = 0.9;
-  objects = [];
+  speed = Math.max(380, W * 0.48);
+  obstacles = [];
+  coins = [];
   particles = [];
+  spawnTimer = 0.8;
+  coinTimer = 1.0;
+  roadOffset = 0;
 
+  player.y = ground - player.r;
+  player.vy = 0;
+  player.grounded = true;
+  player.trail = [];
+  scoreEl.textContent = "0";
+}
+
+function start() {
+  reset();
+  state = "playing";
   startScreen.classList.remove("active");
   gameOverScreen.classList.remove("active");
-
   last = performance.now();
   cancelAnimationFrame(raf);
   raf = requestAnimationFrame(loop);
 }
 
-function endGame() {
+function end() {
   state = "over";
   cancelAnimationFrame(raf);
 
   best = Math.max(best, Math.floor(score));
-  localStorage.setItem("caminoGalacticoBestV2", String(best));
+  localStorage.setItem("caminoGalacticoCleanBest", String(best));
+
   bestEl.textContent = best;
   finalScoreEl.textContent = Math.floor(score);
   finalBestEl.textContent = best;
-
   gameOverScreen.classList.add("active");
 }
 
 function loop(now) {
-  const dt = Math.min((now - last) / 1000, 0.034);
+  const dt = Math.min((now - last) / 1000, 0.033);
   last = now;
 
   update(dt);
@@ -126,162 +133,148 @@ function loop(now) {
   if (state === "playing") raf = requestAnimationFrame(loop);
 }
 
-function update(dt) {
-  score += dt * 18;
-  speed += dt * 0.006;
-  scoreEl.textContent = Math.floor(score);
-
-  // Smooth lane movement
-  const desiredX = laneToX(targetLane, 1);
-  playerX += (desiredX - playerX) * Math.min(1, dt * 13);
-
-  // Jump physics
-  if (isJumping) {
-    jumpVelocity -= dt * 3.8;
-    jump += jumpVelocity * dt;
-    if (jump <= 0) {
-      jump = 0;
-      jumpVelocity = 0;
-      isJumping = false;
-    }
+function jump() {
+  if (state !== "playing") {
+    start();
+    return;
   }
+
+  if (player.grounded) {
+    player.vy = -Math.max(720, H * 1.22);
+    player.grounded = false;
+    burst(player.x, player.y + player.r, C.cyan, 12);
+  }
+}
+
+function update(dt) {
+  score += dt * 16;
+  speed += dt * 7;
+  scoreEl.textContent = Math.floor(score);
+  roadOffset += speed * dt;
+
+  player.vy += Math.max(1800, H * 3.0) * dt;
+  player.y += player.vy * dt;
+
+  if (player.y >= ground - player.r) {
+    player.y = ground - player.r;
+    player.vy = 0;
+    player.grounded = true;
+  }
+
+  player.trail.unshift({ x: player.x, y: player.y, r: player.r, life: 1 });
+  player.trail = player.trail.slice(0, 12);
+  player.trail.forEach(t => {
+    t.x -= speed * dt * 0.34;
+    t.life -= dt * 2.2;
+  });
+  player.trail = player.trail.filter(t => t.life > 0);
 
   spawnTimer -= dt;
   coinTimer -= dt;
 
   if (spawnTimer <= 0) {
     spawnObstacle();
-    spawnTimer = Math.max(0.62, random(1.05, 1.45) - speed * 0.6);
+    spawnTimer = Math.max(0.78, random(1.05, 1.55) - score / 1300);
   }
 
   if (coinTimer <= 0) {
     spawnCoin();
-    coinTimer = random(0.45, 0.78);
+    coinTimer = random(0.75, 1.1);
   }
 
-  for (const obj of objects) {
-    obj.p += dt * (speed + obj.extraSpeed);
-    obj.spin += dt * 3.2;
-  }
+  obstacles.forEach(o => o.x -= speed * dt);
+  coins.forEach(c => {
+    c.x -= speed * dt;
+    c.spin += dt * 4;
+  });
+
+  obstacles = obstacles.filter(o => o.x + o.w > -80);
+  coins = coins.filter(c => !c.dead && c.x + c.r > -50);
 
   for (const s of stars) {
-    s.y += s.v * dt * 0.25;
-    if (s.y > H * 0.64) {
-      s.y = -4;
-      s.x = Math.random() * W;
+    s.x -= s.v * dt;
+    if (s.x < -5) {
+      s.x = W + 10;
+      s.y = Math.random() * H * 0.55;
     }
   }
 
   updateParticles(dt);
   checkCollisions();
-
-  objects = objects.filter(obj => obj.p < 1.22 && !obj.dead);
 }
 
 function spawnObstacle() {
-  const chosenLane = Math.floor(Math.random() * 3);
-  objects.push({
-    type: "block",
-    lane: chosenLane,
-    p: -0.05,
-    spin: Math.random() * 6,
-    extraSpeed: 0
+  const h = random(42, 72) * Math.max(0.85, Math.min(1.15, W / 900));
+  const w = h * random(0.72, 0.95);
+
+  obstacles.push({
+    x: W + 60,
+    y: ground - h,
+    w,
+    h,
+    angle: random(-0.1, 0.1)
   });
 }
 
 function spawnCoin() {
-  const chosenLane = Math.floor(Math.random() * 3);
-  objects.push({
-    type: "coin",
-    lane: chosenLane,
-    p: -0.08,
+  const high = Math.random() > 0.45;
+  coins.push({
+    x: W + 50,
+    y: high ? ground - random(120, 190) : ground - random(58, 95),
+    r: Math.max(10, player.r * 0.48),
     spin: Math.random() * 6,
-    extraSpeed: 0.02
+    dead: false
   });
 }
 
 function checkCollisions() {
-  for (const obj of objects) {
-    if (obj.p > 0.78 && obj.p < 1.02 && obj.lane === targetLane) {
-      if (obj.type === "block") {
-        if (jump < 0.36) {
-          burst(playerX, playerY(), brand.pink, 22);
-          endGame();
-          return;
-        }
-      } else if (obj.type === "coin" && !obj.dead) {
-        obj.dead = true;
-        score += 45;
-        burst(laneToX(obj.lane, obj.p), roadY(obj.p), brand.gold, 14);
-      }
+  for (const o of obstacles) {
+    const pad = player.r * 0.35;
+    const closestX = clamp(player.x, o.x, o.x + o.w);
+    const closestY = clamp(player.y, o.y, o.y + o.h);
+    const dx = player.x - closestX;
+    const dy = player.y - closestY;
+
+    if (dx * dx + dy * dy < (player.r - pad) * (player.r - pad)) {
+      burst(player.x, player.y, C.danger, 24);
+      end();
+      return;
+    }
+  }
+
+  for (const c of coins) {
+    const dx = player.x - c.x;
+    const dy = player.y - c.y;
+    if (dx * dx + dy * dy < (player.r + c.r) * (player.r + c.r)) {
+      c.dead = true;
+      score += 40;
+      burst(c.x, c.y, C.gold, 14);
     }
   }
 }
 
-function moveLeft() {
-  if (state === "start") return startGame();
-  if (state === "over") return startGame();
-  targetLane = Math.max(0, targetLane - 1);
-}
-
-function moveRight() {
-  if (state === "start") return startGame();
-  if (state === "over") return startGame();
-  targetLane = Math.min(2, targetLane + 1);
-}
-
-function doJump() {
-  if (state === "start") return startGame();
-  if (state === "over") return startGame();
-
-  if (!isJumping) {
-    isJumping = true;
-    jumpVelocity = 1.38;
-    burst(playerX, playerY() + 28, brand.cyan, 8);
-  }
-}
-
-function roadY(p) {
-  const horizon = H * 0.29;
-  return horizon + Math.pow(p, 1.7) * (H * 0.68);
-}
-
-function roadWidth(p) {
-  return (W * 0.08) + Math.pow(p, 1.45) * (W * 0.66);
-}
-
-function laneToX(l, p) {
-  const center = W * 0.5;
-  const half = roadWidth(p) * 0.38;
-  const laneOffset = [-half, 0, half][l];
-  return center + laneOffset;
-}
-
-function playerY() {
-  return H * 0.79 - jump * H * 0.22;
-}
-
 function draw() {
-  drawSpace();
+  drawBackground();
   drawRoad();
-  drawObjects();
+  drawCoins();
+  drawObstacles();
   drawPlayer();
   drawParticles();
 
-  if (state === "playing") drawHelp();
+  if (state === "playing") drawTip();
 }
 
-function drawSpace() {
-  const bg = ctx.createLinearGradient(0, 0, 0, H);
-  bg.addColorStop(0, "#020617");
-  bg.addColorStop(0.45, "#050B2E");
-  bg.addColorStop(1, "#020817");
-  ctx.fillStyle = bg;
+function drawBackground() {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, "#020617");
+  g.addColorStop(0.52, C.navy);
+  g.addColorStop(1, "#020817");
+  ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
 
-  const nebula = ctx.createRadialGradient(W * 0.68, H * 0.22, 0, W * 0.68, H * 0.22, W * 0.56);
-  nebula.addColorStop(0, "rgba(0,245,255,0.18)");
-  nebula.addColorStop(0.35, "rgba(30,123,255,0.08)");
+  const nebula = ctx.createRadialGradient(W * 0.68, H * 0.22, 0, W * 0.68, H * 0.22, W * 0.58);
+  nebula.addColorStop(0, "rgba(0,245,255,.18)");
+  nebula.addColorStop(0.38, "rgba(30,123,255,.08)");
   nebula.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = nebula;
   ctx.fillRect(0, 0, W, H);
@@ -289,215 +282,209 @@ function drawSpace() {
   ctx.save();
   for (const s of stars) {
     ctx.globalAlpha = s.a;
-    ctx.fillStyle = brand.white;
+    ctx.fillStyle = C.white;
     ctx.beginPath();
     ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
 
-  // Horizon curve
+  // planet horizon
   const hy = H * 0.33;
   ctx.save();
-  ctx.strokeStyle = "rgba(255,200,87,0.9)";
+  ctx.strokeStyle = "rgba(255,200,87,.86)";
   ctx.lineWidth = 3;
-  ctx.shadowColor = brand.gold;
+  ctx.shadowColor = C.gold;
   ctx.shadowBlur = 18;
   ctx.beginPath();
-  ctx.moveTo(-40, hy + 20);
-  ctx.quadraticCurveTo(W * 0.5, hy - 20, W + 40, hy + 20);
+  ctx.moveTo(-50, hy + 32);
+  ctx.quadraticCurveTo(W * 0.5, hy - 14, W + 50, hy + 32);
   ctx.stroke();
 
-  ctx.fillStyle = brand.gold;
+  ctx.fillStyle = C.gold;
   ctx.beginPath();
-  ctx.arc(W * 0.73, hy + 6, 8, 0, Math.PI * 2);
+  ctx.arc(W * 0.74, hy + 18, 8, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }
 
 function drawRoad() {
-  const horizon = H * 0.36;
-  const bottom = H * 1.04;
-  const center = W * 0.5;
-  const bottomHalf = W * 0.43;
-
   ctx.save();
 
-  const roadGrad = ctx.createLinearGradient(0, horizon, W, bottom);
-  roadGrad.addColorStop(0, "rgba(0,245,255,0.05)");
-  roadGrad.addColorStop(0.45, "rgba(0,245,255,0.18)");
-  roadGrad.addColorStop(1, "rgba(255,200,87,0.13)");
+  const roadTop = ground + player.r * 0.9;
+  const roadBottom = H + 80;
+  const roadH = roadBottom - roadTop;
 
-  ctx.fillStyle = roadGrad;
+  const roadG = ctx.createLinearGradient(0, roadTop, W, roadBottom);
+  roadG.addColorStop(0, "rgba(0,245,255,.17)");
+  roadG.addColorStop(0.55, "rgba(30,123,255,.22)");
+  roadG.addColorStop(1, "rgba(255,200,87,.1)");
+
+  ctx.fillStyle = roadG;
   ctx.beginPath();
-  ctx.moveTo(center - W * 0.035, horizon);
-  ctx.lineTo(center + W * 0.035, horizon);
-  ctx.lineTo(center + bottomHalf, bottom);
-  ctx.lineTo(center - bottomHalf, bottom);
+  ctx.moveTo(-80, roadBottom);
+  ctx.lineTo(W + 80, roadBottom);
+  ctx.lineTo(W * 0.63, roadTop);
+  ctx.lineTo(W * 0.12, roadTop);
   ctx.closePath();
   ctx.fill();
 
-  ctx.shadowColor = brand.cyan;
+  ctx.strokeStyle = "rgba(0,245,255,.9)";
+  ctx.lineWidth = 3;
+  ctx.shadowColor = C.cyan;
+  ctx.shadowBlur = 15;
+
+  ctx.beginPath();
+  ctx.moveTo(W * 0.12, roadTop);
+  ctx.lineTo(-80, roadBottom);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(W * 0.63, roadTop);
+  ctx.lineTo(W + 80, roadBottom);
+  ctx.stroke();
+
+  // moving road lines
+  ctx.lineWidth = 2;
+  ctx.shadowBlur = 7;
+  for (let i = -2; i < 20; i++) {
+    const y = roadTop + ((roadOffset * 0.5 + i * 42) % roadH);
+    const p = (y - roadTop) / roadH;
+    const left = lerp(W * 0.12, -80, p);
+    const right = lerp(W * 0.63, W + 80, p);
+    ctx.strokeStyle = "rgba(244,247,255,.14)";
+    ctx.beginPath();
+    ctx.moveTo(left, y);
+    ctx.lineTo(right, y);
+    ctx.stroke();
+  }
+
+  // ground line
+  ctx.shadowColor = C.cyan;
   ctx.shadowBlur = 16;
-  ctx.lineWidth = 2;
-
-  // lane lines
-  for (let i = -3; i <= 3; i++) {
-    const offset = i / 3;
-    ctx.strokeStyle = i === 0 ? "rgba(0,245,255,0.9)" : "rgba(0,245,255,0.45)";
-    ctx.beginPath();
-    ctx.moveTo(center + offset * W * 0.025, horizon);
-    ctx.lineTo(center + offset * bottomHalf, bottom);
-    ctx.stroke();
-  }
-
-  // cross lines
-  ctx.shadowBlur = 4;
-  for (let p = 0.08; p <= 1.06; p += 0.09) {
-    const y = roadY(p);
-    const half = roadWidth(p) * 0.52;
-    ctx.strokeStyle = "rgba(244,247,255,0.15)";
-    ctx.beginPath();
-    ctx.moveTo(center - half, y);
-    ctx.lineTo(center + half, y);
-    ctx.stroke();
-  }
-
-  ctx.restore();
-}
-
-function drawObjects() {
-  const sorted = [...objects].sort((a, b) => a.p - b.p);
-
-  for (const obj of sorted) {
-    const p = obj.p;
-    if (p < 0 || p > 1.16) continue;
-
-    const x = laneToX(obj.lane, p);
-    const y = roadY(p);
-    const size = 12 + Math.pow(p, 1.45) * 72;
-
-    if (obj.type === "block") drawVoidBlock(x, y, size, obj.spin);
-    if (obj.type === "coin") drawStarCoin(x, y, size * 0.34, obj.spin);
-  }
-}
-
-function drawVoidBlock(x, y, size, spin) {
-  ctx.save();
-  ctx.translate(x, y - size * 0.55);
-  ctx.rotate(Math.sin(spin) * 0.06);
-  ctx.shadowColor = brand.pink;
-  ctx.shadowBlur = 22;
-
-  const g = ctx.createLinearGradient(-size / 2, -size / 2, size / 2, size / 2);
-  g.addColorStop(0, "#FF3D7F");
-  g.addColorStop(1, "#8A2CFF");
-  ctx.fillStyle = g;
-
-  roundRect(-size / 2, -size / 2, size, size, size * 0.16);
-  ctx.fill();
-
-  ctx.lineWidth = Math.max(2, size * 0.04);
-  ctx.strokeStyle = "rgba(255,255,255,0.65)";
-  ctx.stroke();
-
-  ctx.restore();
-}
-
-function drawStarCoin(x, y, r, spin) {
-  ctx.save();
-  ctx.translate(x, y - r * 2.2);
-  ctx.rotate(spin);
-  ctx.shadowColor = brand.gold;
-  ctx.shadowBlur = 22;
-  ctx.fillStyle = brand.gold;
-
+  ctx.strokeStyle = C.cyan;
+  ctx.lineWidth = 4;
   ctx.beginPath();
-  for (let i = 0; i < 10; i++) {
-    const rr = i % 2 === 0 ? r : r * 0.42;
-    const a = (Math.PI * 2 * i) / 10 - Math.PI / 2;
-    ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
-  }
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.strokeStyle = "rgba(255,255,255,0.7)";
-  ctx.lineWidth = 2;
+  ctx.moveTo(0, ground + player.r);
+  ctx.lineTo(W, ground + player.r);
   ctx.stroke();
+
   ctx.restore();
 }
 
 function drawPlayer() {
-  const px = playerX || laneToX(targetLane, 1);
-  const py = playerY();
-  const size = Math.min(88, Math.max(62, W * 0.09));
-
   ctx.save();
-  ctx.translate(px, py);
 
-  // shadow on road
-  ctx.globalAlpha = 0.35;
-  ctx.fillStyle = "rgba(0,245,255,0.5)";
-  ctx.beginPath();
-  ctx.ellipse(0, size * 0.46, size * 0.62, size * 0.16, 0, 0, Math.PI * 2);
-  ctx.fill();
+  // trail
+  for (const t of player.trail) {
+    ctx.globalAlpha = Math.max(0, t.life) * 0.35;
+    ctx.fillStyle = C.cyan;
+    ctx.shadowColor = C.cyan;
+    ctx.shadowBlur = 18;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, t.r * t.life, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.globalAlpha = 1;
 
-  // flame
-  ctx.shadowColor = brand.gold;
-  ctx.shadowBlur = 20;
-  ctx.fillStyle = brand.gold;
+  // comet tail
+  ctx.shadowColor = C.gold;
+  ctx.shadowBlur = 18;
+  const tail = ctx.createLinearGradient(player.x - player.r * 4, player.y, player.x, player.y);
+  tail.addColorStop(0, "rgba(255,200,87,0)");
+  tail.addColorStop(0.42, "rgba(255,200,87,.62)");
+  tail.addColorStop(1, "rgba(0,245,255,.95)");
+  ctx.fillStyle = tail;
   ctx.beginPath();
-  ctx.moveTo(-size * 0.52, size * 0.1);
-  ctx.lineTo(-size * 0.95, 0);
-  ctx.lineTo(-size * 0.52, -size * 0.1);
-  ctx.closePath();
+  ctx.moveTo(player.x - player.r * 4.2, player.y);
+  ctx.quadraticCurveTo(player.x - player.r * 1.4, player.y - player.r * 1.2, player.x, player.y - player.r * .55);
+  ctx.quadraticCurveTo(player.x - player.r * .3, player.y, player.x, player.y + player.r * .55);
+  ctx.quadraticCurveTo(player.x - player.r * 1.4, player.y + player.r * 1.2, player.x - player.r * 4.2, player.y);
   ctx.fill();
 
-  // hover-runner body
-  ctx.shadowColor = brand.cyan;
-  ctx.shadowBlur = 24;
-  const body = ctx.createLinearGradient(-size * 0.5, -size * 0.25, size * 0.5, size * 0.25);
-  body.addColorStop(0, brand.cyan);
-  body.addColorStop(0.55, brand.blue);
-  body.addColorStop(1, brand.white);
+  // main orb
+  ctx.shadowColor = C.cyan;
+  ctx.shadowBlur = 26;
+  const orb = ctx.createRadialGradient(player.x - player.r * .35, player.y - player.r * .45, 2, player.x, player.y, player.r * 1.25);
+  orb.addColorStop(0, C.white);
+  orb.addColorStop(0.35, C.cyan);
+  orb.addColorStop(0.72, C.blue);
+  orb.addColorStop(1, "#08164A");
 
-  ctx.fillStyle = body;
+  ctx.fillStyle = orb;
   ctx.beginPath();
-  ctx.moveTo(-size * 0.52, 0);
-  ctx.quadraticCurveTo(-size * 0.18, -size * 0.34, size * 0.45, -size * 0.25);
-  ctx.quadraticCurveTo(size * 0.68, 0, size * 0.45, size * 0.25);
-  ctx.quadraticCurveTo(-size * 0.18, size * 0.34, -size * 0.52, 0);
-  ctx.closePath();
+  ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2);
   ctx.fill();
 
-  // cockpit
+  // shine
   ctx.shadowBlur = 0;
-  ctx.fillStyle = "rgba(5,11,46,0.88)";
+  ctx.fillStyle = "rgba(255,255,255,.9)";
   ctx.beginPath();
-  ctx.ellipse(size * 0.21, -size * 0.03, size * 0.22, size * 0.14, -0.08, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = "rgba(244,247,255,0.9)";
-  ctx.beginPath();
-  ctx.arc(size * 0.30, -size * 0.09, size * 0.035, 0, Math.PI * 2);
-  ctx.fill();
-
-  // bottom light
-  ctx.fillStyle = brand.gold;
-  ctx.beginPath();
-  ctx.arc(0, size * 0.22, size * 0.05, 0, Math.PI * 2);
+  ctx.arc(player.x + player.r * .32, player.y - player.r * .38, player.r * .16, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.restore();
 }
 
-function drawHelp() {
+function drawObstacles() {
+  for (const o of obstacles) {
+    ctx.save();
+    ctx.translate(o.x + o.w / 2, o.y + o.h / 2);
+    ctx.rotate(o.angle);
+    ctx.shadowColor = C.danger;
+    ctx.shadowBlur = 24;
+
+    const g = ctx.createLinearGradient(-o.w/2, -o.h/2, o.w/2, o.h/2);
+    g.addColorStop(0, C.danger);
+    g.addColorStop(1, C.purple);
+    ctx.fillStyle = g;
+
+    ctx.beginPath();
+    ctx.moveTo(0, -o.h / 2);
+    ctx.lineTo(o.w / 2, o.h / 2);
+    ctx.lineTo(-o.w / 2, o.h / 2);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(255,255,255,.7)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.restore();
+  }
+}
+
+function drawCoins() {
+  for (const c of coins) {
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.rotate(c.spin);
+    ctx.shadowColor = C.gold;
+    ctx.shadowBlur = 22;
+    ctx.fillStyle = C.gold;
+
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const r = i % 2 === 0 ? c.r : c.r * .45;
+      const a = Math.PI * 2 * i / 10 - Math.PI / 2;
+      ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(255,255,255,.75)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawTip() {
   ctx.save();
-  ctx.globalAlpha = 0.66;
-  ctx.fillStyle = brand.white;
+  ctx.globalAlpha = 0.6;
+  ctx.fillStyle = C.white;
   ctx.font = "14px system-ui, sans-serif";
-  ctx.fillText("Move lanes. Jump over void blocks. Collect stars.", 18, 28);
+  ctx.fillText("Tap / Space to jump", 18, 28);
   ctx.restore();
 }
 
@@ -506,12 +493,12 @@ function burst(x, y, color, amount) {
     particles.push({
       x,
       y,
-      vx: random(-150, 150),
-      vy: random(-150, 80),
-      life: random(0.3, 0.75),
-      max: 0.75,
-      color,
-      r: random(2, 5)
+      vx: random(-170, 170),
+      vy: random(-190, 70),
+      life: random(.35, .85),
+      max: .85,
+      r: random(2, 5),
+      color
     });
   }
 }
@@ -521,7 +508,7 @@ function updateParticles(dt) {
     p.life -= dt;
     p.x += p.vx * dt;
     p.y += p.vy * dt;
-    p.vy += 220 * dt;
+    p.vy += 250 * dt;
   }
   particles = particles.filter(p => p.life > 0);
 }
@@ -540,69 +527,28 @@ function drawParticles() {
   ctx.restore();
 }
 
-function roundRect(x, y, w, h, r) {
-  const radius = Math.min(r, w / 2, h / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + radius, y);
-  ctx.arcTo(x + w, y, x + w, y + h, radius);
-  ctx.arcTo(x + w, y + h, x, y + h, radius);
-  ctx.arcTo(x, y + h, x, y, radius);
-  ctx.arcTo(x, y, x + w, y, radius);
-  ctx.closePath();
-}
-
-function random(min, max) {
-  return Math.random() * (max - min) + min;
-}
+function random(min, max) { return Math.random() * (max - min) + min; }
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+function lerp(a, b, t) { return a + (b - a) * t; }
 
 window.addEventListener("resize", resize);
 
 document.addEventListener("keydown", (e) => {
-  if (["ArrowLeft", "KeyA"].includes(e.code)) {
+  if (["Space", "ArrowUp", "KeyW"].includes(e.code)) {
     e.preventDefault();
-    moveLeft();
+    jump();
   }
-  if (["ArrowRight", "KeyD"].includes(e.code)) {
-    e.preventDefault();
-    moveRight();
-  }
-  if (["ArrowUp", "Space", "KeyW"].includes(e.code)) {
-    e.preventDefault();
-    doJump();
-  }
-  if (e.code === "Enter" && state !== "playing") startGame();
-  if (e.code === "KeyR" && state === "over") startGame();
+  if (e.code === "Enter" && state !== "playing") start();
+  if (e.code === "KeyR" && state === "over") start();
 });
 
-leftBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); moveLeft(); });
-rightBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); moveRight(); });
-jumpBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); doJump(); });
-
-startBtn.addEventListener("click", startGame);
-restartBtn.addEventListener("click", startGame);
-
-// Swipe support
-let touchStartX = 0;
-let touchStartY = 0;
-
-canvas.addEventListener("pointerdown", (e) => {
-  touchStartX = e.clientX;
-  touchStartY = e.clientY;
+canvas.parentElement.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  jump();
 });
 
-canvas.addEventListener("pointerup", (e) => {
-  const dx = e.clientX - touchStartX;
-  const dy = e.clientY - touchStartY;
-
-  if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) {
-    dx < 0 ? moveLeft() : moveRight();
-  } else if (Math.abs(dy) > 45 && dy < 0) {
-    doJump();
-  } else if (state !== "playing") {
-    startGame();
-  }
-});
+startBtn.addEventListener("click", start);
+restartBtn.addEventListener("click", start);
 
 resize();
-playerX = laneToX(1, 1);
 draw();
