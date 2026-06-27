@@ -44,3 +44,8 @@ No build command is needed because this is a simple HTML/CSS/JavaScript game.
 
 Developed by **Nexora Games**  
 Parent Company: **Ancherem Innovation LTD**
+
+
+## Version 1.1
+
+Updated the player character from a simple block into a small cosmic runner/astronaut.

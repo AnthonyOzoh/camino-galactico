@@ -335,30 +335,95 @@ function drawPlayer() {
   const h = player.h;
 
   ctx.save();
+
+  // Soft cyan glow around the runner
   ctx.shadowColor = brand.cyan;
-  ctx.shadowBlur = 20;
+  ctx.shadowBlur = 22;
 
-  const bodyGradient = ctx.createLinearGradient(x, y, x + w, y + h);
-  bodyGradient.addColorStop(0, brand.cyan);
-  bodyGradient.addColorStop(0.65, brand.horizonBlue);
-  bodyGradient.addColorStop(1, brand.white);
-
-  ctx.fillStyle = bodyGradient;
-  roundRect(x, y, w, h, 12 * scale);
-  ctx.fill();
-
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = "rgba(5,11,46,0.85)";
+  // Jet flame / speed trail
+  ctx.fillStyle = "rgba(255, 200, 87, 0.95)";
   ctx.beginPath();
-  ctx.arc(x + w * 0.68, y + h * 0.28, Math.max(3, 5 * scale), 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = "rgba(255,200,87,0.95)";
-  ctx.beginPath();
-  ctx.moveTo(x - 10 * scale, y + h * 0.67);
-  ctx.lineTo(x - 30 * scale, y + h * 0.52);
-  ctx.lineTo(x - 10 * scale, y + h * 0.38);
+  ctx.moveTo(x - w * 0.15, y + h * 0.58);
+  ctx.lineTo(x - w * 0.55, y + h * 0.43);
+  ctx.lineTo(x - w * 0.18, y + h * 0.30);
   ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(0, 245, 255, 0.38)";
+  ctx.beginPath();
+  ctx.ellipse(x - w * 0.26, y + h * 0.48, w * 0.45, h * 0.18, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Helmet
+  const helmetGradient = ctx.createLinearGradient(x, y, x + w, y + h * 0.55);
+  helmetGradient.addColorStop(0, "#F4F7FF");
+  helmetGradient.addColorStop(0.45, brand.cyan);
+  helmetGradient.addColorStop(1, brand.horizonBlue);
+
+  ctx.fillStyle = helmetGradient;
+  ctx.beginPath();
+  ctx.arc(x + w * 0.52, y + h * 0.24, w * 0.36, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Helmet glass
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "rgba(5, 11, 46, 0.88)";
+  ctx.beginPath();
+  ctx.ellipse(x + w * 0.63, y + h * 0.22, w * 0.18, h * 0.11, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(244, 247, 255, 0.8)";
+  ctx.beginPath();
+  ctx.arc(x + w * 0.69, y + h * 0.17, Math.max(1.8, 2.8 * scale), 0, Math.PI * 2);
+  ctx.fill();
+
+  // Body suit
+  ctx.shadowColor = brand.cyan;
+  ctx.shadowBlur = 14;
+
+  const suitGradient = ctx.createLinearGradient(x, y + h * 0.35, x + w, y + h);
+  suitGradient.addColorStop(0, brand.cyan);
+  suitGradient.addColorStop(0.7, brand.horizonBlue);
+  suitGradient.addColorStop(1, "#0B2B7A");
+
+  ctx.fillStyle = suitGradient;
+  roundRect(x + w * 0.20, y + h * 0.42, w * 0.56, h * 0.36, 9 * scale);
+  ctx.fill();
+
+  // Chest light
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = brand.gold;
+  ctx.beginPath();
+  ctx.arc(x + w * 0.52, y + h * 0.56, Math.max(2.5, 4 * scale), 0, Math.PI * 2);
+  ctx.fill();
+
+  // Arm
+  ctx.strokeStyle = brand.white;
+  ctx.lineWidth = Math.max(3, 5 * scale);
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(x + w * 0.25, y + h * 0.50);
+  ctx.lineTo(x + w * 0.05, y + h * 0.64);
+  ctx.stroke();
+
+  // Legs
+  ctx.strokeStyle = brand.cyan;
+  ctx.lineWidth = Math.max(4, 6 * scale);
+  ctx.beginPath();
+  ctx.moveTo(x + w * 0.38, y + h * 0.76);
+  ctx.lineTo(x + w * 0.22, y + h * 0.98);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(x + w * 0.64, y + h * 0.76);
+  ctx.lineTo(x + w * 0.82, y + h * 0.96);
+  ctx.stroke();
+
+  // Boots
+  ctx.fillStyle = brand.white;
+  roundRect(x + w * 0.12, y + h * 0.94, w * 0.24, h * 0.08, 5 * scale);
+  ctx.fill();
+  roundRect(x + w * 0.72, y + h * 0.92, w * 0.26, h * 0.08, 5 * scale);
   ctx.fill();
 
   ctx.restore();
